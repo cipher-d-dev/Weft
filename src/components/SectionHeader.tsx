@@ -44,6 +44,10 @@ export const SectionHeader = memo(function SectionHeader({
           fontWeight: sh.labelType.fontWeight,
           letterSpacing: sh.labelType.letterSpacing,
           lineHeight: sh.labelType.lineHeight,
+          // Subtle shadow so header text reads on any wallpaper
+          textShadowColor: 'rgba(0,0,0,0.3)',
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 4,
         },
       ]}
       numberOfLines={1}
@@ -72,9 +76,15 @@ export const SectionHeader = memo(function SectionHeader({
     );
   }
 
-  // No plate — render text only, still aligned flex-start
+  // No plate — render a short decorative line + text in a row
   return (
     <View style={[styles.noPlate, style]}>
+      <View
+        style={[
+          styles.dividerLine,
+          { backgroundColor: sh.textColor, opacity: 0.4 },
+        ]}
+      />
       {textElement}
     </View>
   );
@@ -90,6 +100,13 @@ const styles = StyleSheet.create({
   },
   noPlate: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dividerLine: {
+    width: 24,
+    height: 1,
   },
   label: {
     // color, font props applied inline

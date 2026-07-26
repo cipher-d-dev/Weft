@@ -16,3 +16,5 @@ export { WidgetCard } from './WidgetCard';
 export { AppIcon } from './AppIcon';
 export { Dock } from './Dock';
 export { PreviewCard } from './PreviewCard';
+export { WallpaperBackground } from './WallpaperBackground';
+export { ClockWidget } from './ClockWidget';

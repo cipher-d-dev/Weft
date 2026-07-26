@@ -30,6 +30,7 @@
 import React, { memo, useState } from 'react';
 import {
   Animated,
+  Platform,
   StyleSheet,
   Text,
   TouchableWithoutFeedback,
@@ -37,6 +38,25 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// BlurView — Glass paradigm panel blur effect.
+// Imported with a try/catch-style lazy require so the app doesn't crash if
+// the native module isn't linked yet (e.g. first run before npm install).
+let BlurView: React.ComponentType<{
+  style?: ViewStyle;
+  blurType?: string;
+  blurAmount?: number;
+  reducedTransparencyFallbackColor?: string;
+}> | null = null;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  BlurView = require('@react-native-community/blur').BlurView;
+} catch {
+  // Native module not linked — Glass panel will fall back to solid tint.
+  BlurView = null;
+}
+
 import { useWeftConfig } from '../hooks/useWeftConfig';
 import { Tile } from '../components/Tile';
 import { Slider } from '../components/Slider';
@@ -163,11 +183,19 @@ export const ControlCenterScreen = memo(function ControlCenterScreen({
   });
 
   // ── Background resolution ──────────────────────────────────────────────
-  // Glass: use glassContainer.tint as the panel background
-  // Skeuo / Minimal: use controlCenter surface background
-  const panelBackground = gc !== null
+  // Glass + BlurView available: panel bg is transparent, BlurView provides
+  // the frosted glass effect using the token's blurRadius.
+  // Glass + no BlurView (module not linked): fall back to gc.tint solid color.
+  // Skeuo / Minimal: use controlCenter surface background (no blur).
+  const isGlass = gc !== null;
+  const useBlur = isGlass && BlurView !== null;
+  const panelBackground = useBlur
+    ? 'transparent'
+    : isGlass
     ? gc.tint
     : s.surface.controlCenter.background;
+
+  const blurRadius = isGlass ? gc.blurRadius : 0;
 
   // ── Icon size from tile tokens ─────────────────────────────────────────
   const iconSize = Math.round(s.component.tile.touchTarget * 0.38);
@@ -203,7 +231,6 @@ export const ControlCenterScreen = memo(function ControlCenterScreen({
             backgroundColor: panelBackground,
             borderBottomLeftRadius: gc !== null ? gc.radius : s.component.widgetCard.radius,
             borderBottomRightRadius: gc !== null ? gc.radius : s.component.widgetCard.radius,
-            // Shadow from controlCenter surface elevation
             elevation: 24,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 8 },
@@ -214,6 +241,36 @@ export const ControlCenterScreen = memo(function ControlCenterScreen({
           },
         ]}
       >
+        {/* ── BlurView for Glass paradigm — absolute fill behind content ── */}
+        {useBlur && BlurView !== null && (
+          <BlurView
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderBottomLeftRadius: gc!.radius,
+                borderBottomRightRadius: gc!.radius,
+              },
+            ]}
+            blurType={Platform.OS === 'android' ? 'dark' : 'dark'}
+            blurAmount={blurRadius}
+            reducedTransparencyFallbackColor={gc!.tint}
+          />
+        )}
+
+        {/* ── Tint overlay on top of blur (glass color) ─────────────── */}
+        {useBlur && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: gc!.tint,
+                borderBottomLeftRadius: gc!.radius,
+                borderBottomRightRadius: gc!.radius,
+              },
+            ]}
+            pointerEvents="none"
+          />
+        )}
         {/* ── Drag handle ─────────────────────────────────────────── */}
         <View style={styles.handleRow}>
           <View

@@ -152,19 +152,21 @@ export type DockTokens = {
 };
 
 export type AppIconTokens = {
-  /**
-   * Icon container size. Paradigm-invariant — icon image itself is
-   * always the same size. Only the shadow/badge chrome around it changes.
-   */
   containerSize: SizeToken;
-  /** Corner radius of the icon container (system icon shape). */
   radius: SizeToken;
-  /** Drop shadow on the icon chrome. Reduced/none in Minimal paradigm. */
   shadow: ShadowToken;
-  /** Label color below icon. */
   labelColor: ColorToken;
-  /** Typography for the icon label. */
   labelType: TypographyToken;
+  /**
+   * Optional text shadow on the icon label.
+   * Null in Skeuo (light bg — no shadow needed, looks blurry).
+   * Set in Glass/Minimal (dark bg — shadow lifts text off background).
+   */
+  labelTextShadow: {
+    color: string;
+    offset: { width: number; height: number };
+    radius: number;
+  } | null;
 };
 
 /**

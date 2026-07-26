@@ -3,8 +3,10 @@
  *
  * Phase 4: The live launcher home surface. Replaces AtomTestScreen as the
  * app entry point. Renders:
- *   - Real installed app grid (FlatList, numColumns from semantics)
- *   - A WidgetCard placeholder slot at the top
+ *   - Real installed app grid (paginated horizontal FlatList, 4 rows per page)
+ *   - A ClockWidget + SectionHeader on page 0 only
+ *   - Page indicator dots above the floating Customise pill
+ *   - A floating 'Customise' pill above the Dock (absolutely positioned)
  *   - A Dock pinned to the bottom with four fixed app shortcuts
  *   - Status bar handled via translucent + useSafeAreaInsets
  *
@@ -22,7 +24,7 @@
  * replace this with a real wallpaper layer via WallpaperManager.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -32,6 +34,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,8 +45,9 @@ import { useWeftConfig } from '../hooks/useWeftConfig';
 import { useInstalledApps } from '../hooks/useInstalledApps';
 import { AppIcon } from '../components/AppIcon';
 import { Dock } from '../components/Dock';
-import { WidgetCard } from '../components/WidgetCard';
 import { SectionHeader } from '../components/SectionHeader';
+import { WallpaperBackground } from '../components/WallpaperBackground';
+import { ClockWidget } from '../components/ClockWidget';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -60,15 +64,11 @@ const DOCK_PACKAGES = [
   'com.android.settings',     // Settings
 ];
 
-// Glass paradigm wallpaper fallback — deep blue-grey that reads well under
-// glass tints. Swapped for a real WallpaperManager layer in Phase 7.
-const GLASS_FALLBACK_BG = '#0B2438';
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Single app icon cell rendered inside the FlatList grid. */
+/** Single app icon cell rendered inside the page grid. */
 const AppGridItem = React.memo(function AppGridItem({
   app,
   iconSize,
@@ -136,21 +136,130 @@ function DockApps({
 }
 
 // ---------------------------------------------------------------------------
+// FloatingCustomiseButton — pill that floats above the dock
+// ---------------------------------------------------------------------------
+
+/**
+ * Absolutely-positioned pill centered horizontally, sitting 8dp above the
+ * top edge of the dock. Does not affect layout flow.
+ */
+function FloatingCustomiseButton({
+  onPress,
+  dockHeight,
+  bottomInset,
+  isDark,
+}: {
+  onPress?: () => void;
+  dockHeight: number;
+  bottomInset: number;
+  isDark: boolean;
+}) {
+  const bottomOffset = bottomInset + dockHeight + 8;
+
+  // Use white or dark pill depending on whether the paradigm has a dark background
+  // Using hardcoded rgba instead of hex-appending to variable color strings
+  // (which breaks on rgba() values like Glass/Minimal textSecondary)
+  const bgColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.10)';
+  const borderColor = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.15)';
+  const textColor = isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.55)';
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.floatingPill,
+        {
+          bottom: bottomOffset,
+          backgroundColor: bgColor,
+          borderColor: borderColor,
+        },
+      ]}
+      accessible
+      accessibilityLabel="Customise launcher"
+      accessibilityRole="button"
+      activeOpacity={0.7}
+    >
+      <Text
+        style={[
+          styles.floatingPillText,
+          { color: textColor },
+        ]}
+      >
+        ✦ Customise
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PageDots — indicator dots for the horizontal page FlatList
+// ---------------------------------------------------------------------------
+
+function PageDots({
+  count,
+  activeIndex,
+  accentColor,
+  inactiveColor,
+  dockHeight,
+  bottomInset,
+}: {
+  count: number;
+  activeIndex: number;
+  accentColor: string;
+  inactiveColor: string;
+  dockHeight: number;
+  bottomInset: number;
+}) {
+  if (count <= 1) {
+    return null;
+  }
+
+  // Sit 8dp above the FloatingCustomiseButton (which is dockHeight+8+bottomInset from bottom).
+  // FloatingCustomiseButton pill height ~28dp. So dots sit at dockHeight+8+bottomInset+28+8.
+  const bottomOffset = bottomInset + dockHeight + 8 + 28 + 8;
+
+  return (
+    <View
+      style={[styles.pageDotsContainer, { bottom: bottomOffset }]}
+      accessible
+      accessibilityLabel={`Page ${activeIndex + 1} of ${count}`}
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.pageDot,
+            {
+              backgroundColor: i === activeIndex ? accentColor : inactiveColor,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // HomeScreen
 // ---------------------------------------------------------------------------
 
 type HomeScreenProps = {
   /** Called when a downward swipe from the top edge is detected. */
   onOpenControlCenter?: () => void;
+  /** Called when the user taps the customize gear in the dock. */
+  onOpenCustomization?: () => void;
 };
 
-export function HomeScreen({ onOpenControlCenter }: HomeScreenProps): React.JSX.Element {
+export function HomeScreen({ onOpenControlCenter, onOpenCustomization }: HomeScreenProps): React.JSX.Element {
   const { semantics, paradigm } = useWeftConfig();
   const insets = useSafeAreaInsets();
   const { apps, loading, error } = useInstalledApps();
 
   const s = semantics;
   const layout = s.layout;
+
+  // ── Current page tracking ─────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(0);
 
   // ── Back handler ──────────────────────────────────────────────────────────
   // Launchers must swallow the back button — returning true suppresses exit.
@@ -183,14 +292,6 @@ export function HomeScreen({ onOpenControlCenter }: HomeScreenProps): React.JSX.
     }),
   ).current;
 
-  // ── Background ────────────────────────────────────────────────────────────
-  // Glass background is 'transparent' — use the fallback so content is legible
-  // until Phase 7 wires up the real wallpaper layer.
-  const surfaceBg =
-    s.surface.home.background === 'transparent'
-      ? GLASS_FALLBACK_BG
-      : s.surface.home.background;
-
   // ── Layout math ───────────────────────────────────────────────────────────
   // One-Handed profile: thumbSide biases padding left or right.
   // 'center' → equal padding both sides (default).
@@ -213,26 +314,121 @@ export function HomeScreen({ onOpenControlCenter }: HomeScreenProps): React.JSX.
   const cellWidth = (availableWidth - totalGapWidth) / layout.gridColumns;
   const iconSize = s.component.appIcon.containerSize;
 
-  // ── FlatList key extractor & renderer ─────────────────────────────────────
-  const keyExtractor = useCallback((item: AppDetail) => item.packageName, []);
+  // Dock height + bottom inset — used for floating pill positioning and
+  // page content bottom padding.
+  const dockClearance = s.component.dock.height + insets.bottom + 8;
 
-  const renderItem = useCallback(
-    ({ item }: { item: AppDetail }) => (
-      <AppGridItem app={item} iconSize={iconSize} cellWidth={cellWidth} />
-    ),
-    [iconSize, cellWidth],
+  // ── Pagination ────────────────────────────────────────────────────────────
+  // 4 rows per page × gridColumns apps per row.
+  const appsPerPage = layout.gridColumns * 4;
+
+  const pages = useMemo<AppDetail[][]>(() => {
+    if (apps.length === 0) {
+      return [];
+    }
+    const result: AppDetail[][] = [];
+    for (let i = 0; i < apps.length; i += appsPerPage) {
+      result.push(apps.slice(i, i + appsPerPage));
+    }
+    return result;
+  }, [apps, appsPerPage]);
+
+  // ── Page scroll handler ───────────────────────────────────────────────────
+  const handlePageScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { x: number } } }) => {
+      const pageIndex = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+      setCurrentPage(pageIndex);
+    },
+    [],
   );
 
-  // Dock height + bottom inset — scroll content stops above the dock
-  const dockClearance = s.component.dock.height + insets.bottom + 8;
+  // ── Page renderer ─────────────────────────────────────────────────────────
+  const renderPage = useCallback(
+    ({ item: pageApps, index: pageIndex }: { item: AppDetail[]; index: number }) => {
+      // Build rows of gridColumns items for this page
+      const rows: AppDetail[][] = [];
+      for (let i = 0; i < pageApps.length; i += layout.gridColumns) {
+        rows.push(pageApps.slice(i, i + layout.gridColumns));
+      }
+
+      return (
+        <View
+          style={[
+            styles.page,
+            {
+              width: SCREEN_WIDTH,
+              paddingTop: insets.top + 8,
+              paddingLeft,
+              paddingRight,
+              paddingBottom: dockClearance,
+            },
+          ]}
+        >
+          {/* Clock and section header only on page 0 */}
+          {pageIndex === 0 && (
+            <View style={{ marginBottom: layout.sectionGap }}>
+              <ClockWidget />
+              <View style={{ marginTop: layout.sectionGap * 0.5 }}>
+                <SectionHeader label="Apps" />
+              </View>
+            </View>
+          )}
+
+          {/* App grid rows */}
+          <View style={styles.pageGrid}>
+            {rows.map((row, rowIndex) => (
+              <View
+                key={rowIndex}
+                style={[styles.pageRow, { gap: layout.gridGap, marginBottom: layout.gridGap }]}
+              >
+                {row.map(app => (
+                  <AppGridItem
+                    key={app.packageName}
+                    app={app}
+                    iconSize={iconSize}
+                    cellWidth={cellWidth}
+                  />
+                ))}
+                {/* Fill trailing empty cells in the last row */}
+                {row.length < layout.gridColumns &&
+                  Array.from({ length: layout.gridColumns - row.length }).map((_, i) => (
+                    <View key={`empty-${i}`} style={{ width: cellWidth }} />
+                  ))}
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    },
+    [
+      insets.top,
+      paddingLeft,
+      paddingRight,
+      dockClearance,
+      layout.gridColumns,
+      layout.gridGap,
+      layout.sectionGap,
+      iconSize,
+      cellWidth,
+    ],
+  );
+
+  const pageKeyExtractor = useCallback((_: AppDetail[], index: number) => String(index), []);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View
-      style={[styles.root, { backgroundColor: surfaceBg }]}
+      style={[styles.root, { backgroundColor: 'transparent' }]}
       {...swipeGesture.panHandlers}
     >
-      <StatusBar backgroundColor="transparent" translucent barStyle="light-content" />
+      {/* ── Wallpaper layer — sits behind all content ──────────────── */}
+      <WallpaperBackground screenWidth={SCREEN_WIDTH} />
+
+      <StatusBar
+        backgroundColor="transparent"
+        translucent
+        barStyle={paradigm === 'skeuo' ? 'dark-content' : 'light-content'}
+      />
 
       {/* ── Loading state ─────────────────────────────────────────────── */}
       {loading && (
@@ -256,56 +452,55 @@ export function HomeScreen({ onOpenControlCenter }: HomeScreenProps): React.JSX.
         </View>
       )}
 
-      {/* ── App grid ──────────────────────────────────────────────────── */}
-      {!loading && error === null && (
+      {/* ── Empty state ───────────────────────────────────────────────── */}
+      {!loading && error === null && apps.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyEmoji}>📱</Text>
+          <Text style={[styles.emptyTitle, { color: s.surface.home.textPrimary }]}>
+            No apps found
+          </Text>
+          <Text style={[styles.emptySub, { color: s.surface.home.textSecondary }]}>
+            Pull down to refresh
+          </Text>
+        </View>
+      )}
+
+      {/* ── Paginated app grid ────────────────────────────────────────── */}
+      {!loading && error === null && pages.length > 0 && (
         <FlatList
-          data={apps}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          numColumns={layout.gridColumns}
-          // key prop forces FlatList to re-mount when column count changes
-          // (Cognitive profile reduces columns from 4 → 3)
-          key={layout.gridColumns}
-          contentContainerStyle={[
-            styles.gridContent,
-            {
-              paddingTop: insets.top + 8,
-              paddingLeft,
-              paddingRight,
-              paddingBottom: dockClearance,
-              gap: layout.gridGap,
-            },
-          ]}
-          columnWrapperStyle={
-            layout.gridColumns > 1
-              ? { gap: layout.gridGap }
-              : undefined
-          }
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={{ marginBottom: layout.sectionGap }}>
-              {/* ── Widget card placeholder ─────────────────────────── */}
-              <SectionHeader label="Widgets" />
-              <WidgetCard>
-                <Text
-                  style={[
-                    styles.widgetPlaceholder,
-                    {
-                      color: s.surface.home.textSecondary,
-                      fontFamily: s.component.appIcon.labelType.fontFamily,
-                      fontSize: s.component.appIcon.labelType.fontSize,
-                    },
-                  ]}
-                >
-                  Widget slot — Phase 7
-                </Text>
-              </WidgetCard>
-              {/* ── Apps section header ─────────────────────────────── */}
-              <View style={{ marginTop: layout.sectionGap }}>
-                <SectionHeader label="Apps" />
-              </View>
-            </View>
-          }
+          data={pages}
+          keyExtractor={pageKeyExtractor}
+          renderItem={renderPage}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handlePageScroll}
+          scrollEventThrottle={16}
+          style={styles.pageFlatList}
+          // Re-mount when column count changes (Cognitive profile: 4→3 columns)
+          key={`pages-${layout.gridColumns}`}
+        />
+      )}
+
+      {/* ── Page indicator dots ───────────────────────────────────────── */}
+      {!loading && pages.length > 1 && (
+        <PageDots
+          count={pages.length}
+          activeIndex={currentPage}
+          accentColor={s.accent.primary}
+          inactiveColor={`${s.surface.home.textSecondary}4D`} // 30% opacity ≈ hex 4D
+          dockHeight={s.component.dock.height}
+          bottomInset={insets.bottom}
+        />
+      )}
+
+      {/* ── Floating customise pill — above the dock ──────────────────── */}
+      {!loading && (
+        <FloatingCustomiseButton
+          onPress={onOpenCustomization}
+          dockHeight={s.component.dock.height}
+          bottomInset={insets.bottom}
+          isDark={paradigm !== 'skeuo'}
         />
       )}
 
@@ -345,9 +540,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
-  gridContent: {
-    // paddingTop/Bottom/Left/Right applied inline from insets + semantics
-  },
   gridCell: {
     alignItems: 'center',
   },
@@ -359,8 +551,70 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 12,
   },
-  widgetPlaceholder: {
+  // ── Paginated grid ──
+  pageFlatList: {
+    flex: 1,
+  },
+  page: {
+    // width, paddingTop/Left/Right/Bottom applied inline
+  },
+  pageGrid: {
+    // Rows stack vertically; each row is a pageRow
+  },
+  pageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // ── Floating pill ──
+  floatingPill: {
+    position: 'absolute',
+    alignSelf: 'center',
+    // bottom applied inline
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  floatingPillText: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.8,
     textAlign: 'center',
-    paddingVertical: 24,
+  },
+  // ── Page dots ──
+  pageDotsContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    // bottom applied inline
+  },
+  pageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  // ── Empty / error states ──
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyEmoji: {
+    fontSize: 56,
+    textAlign: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

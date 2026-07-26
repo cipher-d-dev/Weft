@@ -1,9 +1,40 @@
 <resources>
 
-    <!-- Base application theme. -->
+    <!--
+        Weft — AppTheme
+        
+        A launcher must own the full screen. We achieve this by:
+        1. Transparent status bar and navigation bar so Weft draws underneath both
+        2. windowLayoutInDisplayCutoutMode = shortEdges so content extends into notch area
+        3. Disabling the window background so React Native's own background shows
+        4. Keeping NoActionBar so there's no system toolbar
+        
+        The nav bar and status bar icon colors are controlled at runtime from JS
+        via StatusBar API and our WeftSystemUIModule.
+    -->
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+
+        <!-- Remove the default white window background — RN provides its own -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+
+        <!-- Status bar: fully transparent, icons handled by RN StatusBar API -->
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+
+        <!-- Navigation bar: fully transparent so Weft draws behind it -->
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+
+        <!-- Draw behind both bars — this is what makes it truly edge-to-edge -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+
+        <!-- Extend layout into the display cutout (notch) area -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+
+        <!-- Keep the EditText background for React Native text inputs -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+
     </style>
 
 </resources>

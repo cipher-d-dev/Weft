@@ -117,11 +117,11 @@ export function semanticsSkeuo(): AppSemantics {
         touchTarget: 44,
       },
       sectionHeader: {
-        textColor: neutral[600],
-        plateBackground: `rgba(237, 232, 223, ${opacity[80]})`,
-        plateRadius: radii.sm,
-        platePaddingV: spacing[1],
-        platePaddingH: spacing[3],
+        textColor: neutral[500],
+        plateBackground: 'transparent',  // no plate in skeuo — clean label only
+        plateRadius: radii.none,
+        platePaddingV: 0,
+        platePaddingH: 0,
         labelType: typography.labelSm,
       },
       widgetCard: {
@@ -142,9 +142,16 @@ export function semanticsSkeuo(): AppSemantics {
       appIcon: {
         containerSize: 60,
         radius: radii.lg,
-        shadow: elevation.sm,
+        shadow: {
+          elevation: 2,
+          shadowColor: '#5C4A32',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.12,
+          shadowRadius: 2,
+        },
         labelColor: neutral[800],
         labelType: typography.captionMd,
+        labelTextShadow: null,  // light bg — no text shadow needed
       },
       glassContainer: null,
     },
@@ -252,7 +259,7 @@ export function semanticsGlass(): AppSemantics {
         radius: radii.xl,         // 22px — glass-specific
         touchTarget: 64,
         padding: spacing[4],
-        shadow: elevation.sm,
+        shadow: elevation.none,   // Glass: no elevation — depth comes from tint+blur
         labelType: typography.labelSm,
         chipType: typography.captionMd,
       },
@@ -299,9 +306,20 @@ export function semanticsGlass(): AppSemantics {
       appIcon: {
         containerSize: 60,
         radius: radii.lg,
-        shadow: elevation.xs,    // lighter shadow on glass — depth via blur
+        shadow: {
+          elevation: 6,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.45,
+          shadowRadius: 8,
+        },
         labelColor: neutral[0],
         labelType: typography.captionMd,
+        labelTextShadow: {
+          color: 'rgba(0,0,0,0.6)',
+          offset: { width: 0, height: 1 },
+          radius: 4,
+        },
       },
       glassContainer: {
         tint: alpha.glass60,     // 60% white tint — deepens to 92% under Vision
@@ -463,6 +481,11 @@ export function semanticsMinimal(): AppSemantics {
         shadow: elevation.none,
         labelColor: neutral[300],
         labelType: typography.captionMd,
+        labelTextShadow: {
+          color: 'rgba(0,0,0,0.5)',
+          offset: { width: 0, height: 1 },
+          radius: 3,
+        },
       },
       glassContainer: null,
     },

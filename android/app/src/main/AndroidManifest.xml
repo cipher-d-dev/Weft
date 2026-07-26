@@ -5,6 +5,11 @@
          enumerate installed apps. Without this, getApps() returns an empty
          list on API 30+ devices. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Required to read the system wallpaper drawable via WallpaperManager -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- Required to set navigation bar color and control system UI -->
+    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION" />
 
     <application
       android:name=".MainApplication"
@@ -22,13 +27,16 @@
         android:launchMode="singleTask"
         android:taskAffinity=""
         android:windowSoftInputMode="adjustResize"
-        android:exported="true">
-        <!-- Standard app launcher intent -->
+        android:exported="true"
+        android:stateNotNeeded="true">
+        <!-- Standard app launcher intent — shows Weft in the app drawer -->
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
-        <!-- Home/launcher role — makes Weft appear in "Choose default launcher" -->
+        <!-- Home/launcher role — makes Weft appear in "Choose default launcher"
+             and respond to the Home button press.
+             Both HOME and DEFAULT are required; HOME alone is not sufficient. -->
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />

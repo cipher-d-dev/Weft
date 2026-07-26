@@ -9,19 +9,24 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 
 class MainApplication : Application(), ReactApplication {
 
-  override val reactHost: ReactHost by lazy {
-    getDefaultReactHost(
-      context = applicationContext,
-      packageList =
-        PackageList(this).packages.apply {
-          // Packages that cannot be autolinked yet can be added manually here, for example:
-          // add(MyReactNativePackage())
-        },
-    )
-  }
+    override val reactHost: ReactHost by lazy {
+        getDefaultReactHost(
+            context = applicationContext,
+            packageList =
+                PackageList(this).packages.apply {
+                    // Weft native modules:
+                    // WallpaperModule — reads system wallpaper as base64 for JS rendering
+                    add(WallpaperPackage())
+                    // WeftSystemUIModule — controls nav bar color and icon tints from JS
+                    add(WeftSystemUIPackage())
+                    // SetDefaultLauncherModule — prompts user to set Weft as default home
+                    add(SetDefaultLauncherPackage())
+                },
+        )
+    }
 
-  override fun onCreate() {
-    super.onCreate()
-    loadReactNative(this)
-  }
+    override fun onCreate() {
+        super.onCreate()
+        loadReactNative(this)
+    }
 }
