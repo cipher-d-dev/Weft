@@ -1,45 +1,25 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
+ * Weft — App Root
  *
- * @format
+ * Phase 4: SafeAreaProvider wraps the entire tree so every surface can read
+ * native insets via useSafeAreaInsets(). WeftConfigProvider sits inside it
+ * so context consumers can also read insets if needed.
+ *
+ * HomeScreen is the live launcher surface from Phase 4+.
+ * AtomTestScreen is kept importable for dev reference.
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { WeftConfigProvider } from './src/context/WeftConfigContext';
+import { HomeScreen } from './src/surfaces/HomeScreen';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
+export default function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <WeftConfigProvider>
+        <HomeScreen />
+      </WeftConfigProvider>
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
