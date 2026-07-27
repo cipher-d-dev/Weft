@@ -1,6 +1,30 @@
 <resources>
 
     <!--
+        Weft — SplashTheme
+
+        Applied to MainActivity before React Native loads. Shows a dark
+        background with the Weft logo centered. Switches to AppTheme
+        immediately when the JS bundle is ready (handled in MainActivity.kt).
+
+        Place your logo at:
+          android/app/src/main/res/drawable/splash_logo.png
+        Or per density:
+          drawable-mdpi/    (48dp)
+          drawable-hdpi/    (72dp)
+          drawable-xhdpi/   (96dp)
+          drawable-xxhdpi/  (144dp)
+          drawable-xxxhdpi/ (192dp)
+    -->
+    <style name="SplashTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+
+    <!--
         Weft — AppTheme
         
         A launcher must own the full screen. We achieve this by:

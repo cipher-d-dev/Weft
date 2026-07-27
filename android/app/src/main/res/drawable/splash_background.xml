@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Weft — Splash Background
+
+    Layer-list drawable used as the windowBackground during launch.
+    Layer 0: solid dark background (#080C12 matches the JS onboarding bg)
+    Layer 1: the logo image, centered
+
+    To use your own logo:
+      1. Place splash_logo.png in android/app/src/main/res/drawable/
+      2. Done — this file already references @drawable/splash_logo
+      3. Adjust android:width / android:height if needed (default 120dp × 120dp)
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Layer 0: Dark launch background -->
+    <item>
+        <color android:color="#080C12" />
+    </item>
+
+    <!-- Layer 1: Centered logo -->
+    <item
+        android:gravity="center"
+        android:width="120dp"
+        android:height="120dp">
+        <bitmap
+            android:src="@drawable/splash_logo"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+
+</layer-list>

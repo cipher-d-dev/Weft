@@ -296,7 +296,7 @@ export function semanticsGlass(): AppSemantics {
         shadow: elevation.md,
       },
       dock: {
-        background: alpha.glass60,
+        background: `rgba(10, 25, 47, 0.82)`,   // deep navy, not white glass — labels are white so dock must be dark
         border: alpha.glass60,
         radius: radii['2xl'],
         height: 80,

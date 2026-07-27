@@ -1,18 +1,200 @@
 # Weft
 
-A modular, accessibility-centered Android launcher built with React Native. Weft demonstrates a three-paradigm design system (Skeuomorphic, Glass, Minimal) composable with four independent accessibility profiles (Motor, Vision, Cognitive, One-Handed) through a live token architecture.
+<p align="center">
+  <img src="screenshots/skeuomorphic.png" width="23%" />
+  <img src="screenshots/glass.png" width="23%" />
+  <img src="screenshots/minimal.png" width="23%" />
+  <img src="screenshots/customize.png" width="23%" />
+</p>
+
+<p align="center">
+  <strong>A modular, accessibility-centered Android launcher built with React Native.</strong><br />
+  Three visual paradigms. Four accessibility profiles. One compose pipeline.
+</p>
+
+<p align="center">
+  <img alt="React Native" src="https://img.shields.io/badge/React%20Native-0.86.0-61DAFB?logo=react&logoColor=white" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white" />
+  <img alt="Android" src="https://img.shields.io/badge/Android-API%2029%2B-3DDC84?logo=android&logoColor=white" />
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-green" />
+</p>
+
+---
+
+## What is Weft?
+
+Weft is a fully functional Android home screen launcher that demonstrates a live design token architecture. Every visual property — colors, typography, shadows, spacing, radii — flows through a single composable pipeline:
+
+```
+compose(paradigm, activeProfiles) → AppSemantics
+```
+
+Switch paradigm from **Skeuomorphic** to **Glass** to **Minimal**, toggle **Motor**, **Vision**, **Cognitive**, or **One-Handed** accessibility profiles, and the entire UI recomposes in real time. No conditional logic inside components. No duplicated styles. One pure function determines the visual output of the whole app.
+
+---
+
+## Screenshots
+
+| Skeuomorphic | Glass | Minimal | Customise |
+|:---:|:---:|:---:|:---:|
+| ![Skeuomorphic](screenshots/skeuomorphic.png) | ![Glass](screenshots/glass.png) | ![Minimal](screenshots/minimal.png) | ![Customise](screenshots/customize.png) |
+| Warm parchment, amber accent | Frosted dark, cool blue | Flat near-black, sage green | Live paradigm picker |
+
+---
+
+## Features
+
+### Three Visual Paradigms
+
+| | Skeuomorphic | Glass | Minimal |
+|---|---|---|---|
+| **Background** | Warm parchment tones | Frosted dark surfaces | Near-black flat |
+| **Accent** | Amber | Cool blue | Sage green |
+| **Depth** | Soft shadows & elevation | Translucent tints + blur | Zero elevation |
+| **Radii** | 16px | 22px | 12px |
+| **Typography** | Inter UI + Fraunces display | Inter UI + Fraunces display | Inter UI |
+
+### Four Accessibility Profiles
+
+Each profile is an independent delta applied on top of the active paradigm. Multiple profiles compose simultaneously in a fixed order.
+
+| Profile | Changes |
+|---|---|
+| **Motor** | Touch targets → 72px, wider grid gaps, taller dock |
+| **Vision** | Larger typography, maximum contrast, raised plate opacity |
+| **Cognitive** | 4→3 column grid, reduced chrome, simplified layout |
+| **One-Handed** | Grid shifts into thumb zone (right-biased padding) |
+
+### Glass × Vision Cascade
+
+When both Glass paradigm and Vision profile are active, a special intersection rule fires automatically in `compose.ts`:
+
+- Container tint deepens from 60% → 92% opacity
+- Section header plates clear to transparent
+- Tile status chips become transparent
+- WCAG-grade contrast guaranteed without a separate design decision
+
+### Launcher Capabilities
+
+- **Live clock widget** — updates every second, entrance animation on load
+- **Real app grid** — reads installed apps from the device, paginated horizontal swipe
+- **Page indicator dots** — accent-colored active dot, 30% inactive
+- **Dock** — pinned apps with haptic long-press feedback
+- **Floating Customise pill** — sits above the dock, non-intrusive
+- **Pull-down Control Center** — 6 toggle tiles + brightness/volume sliders
+- **Customization screen** — live `PreviewCard` per paradigm, local pending state
+- **Onboarding flow** — first-launch paradigm picker with animated card selection
+- **Spring press animations** — 0.88 scale squish on every icon, native driver
+- **Haptic feedback** — 50ms vibration on icon long-press
+- **System wallpaper passthrough** — reads real wallpaper via `WallpaperManager`, renders behind UI
+- **Edge-to-edge display** — draws behind status bar and navigation bar
+- **Persistent config** — `AsyncStorage` survives app restarts and phone reboots
+- **System UI theming** — nav bar and status bar icon tints match active paradigm
+- **Default launcher prompt** — `RoleManager` dialog after onboarding
+
+---
+
+## Architecture
+
+### The Core Insight
+
+```
+compose(paradigm, activeProfiles) → AppSemantics
+```
+
+Every component reads exclusively from `AppSemantics` via `useWeftConfig().semantics`. No component checks which paradigm is active or which profiles are on. The entire visual system is determined by a single pure function.
+
+### Three-Tier Token System
+
+```
+Tier 1 — Primitives  (src/tokens/primitives.ts)
+  Raw values: color ramps, spacing scale, radii, shadows, typography scale
+  Nothing reads primitives directly except tier 3.
+
+Tier 2 — Semantics  (src/tokens/semantics.ts)
+  Typed AppSemantics interface — the contract every component reads from.
+  Fields: surface.home, surface.controlCenter, component.tile,
+          component.dock, component.appIcon, layout, accent, state.tile
+
+Tier 3 — Paradigm Factories  (src/tokens/paradigms.ts)
+  semanticsSkeuo() | semanticsGlass() | semanticsMinimal()
+  Each returns a complete AppSemantics object populated from primitives only.
+
+Profile Deltas  (src/tokens/profiles.ts)
+  applyMotor() | applyVision() | applyCognitive() | applyOneHanded()
+  Accept AppSemantics, override relevant fields, return new AppSemantics.
+  Paradigm-agnostic — no branching on paradigm identity.
+
+Compose Pipeline  (src/compose/compose.ts)
+  1. Select paradigm factory → base AppSemantics
+  2. Apply profile deltas: Motor → Vision → Cognitive → OneHanded
+  3. Apply intersection cascades (Glass × Vision rule)
+  4. Object.freeze() → return
+```
+
+### Adding Things
+
+| Task | Work required |
+|---|---|
+| New paradigm | One factory function in `paradigms.ts` |
+| New accessibility profile | One delta function in `profiles.ts` |
+| New component | Read existing tokens from `useWeftConfig().semantics` |
+| New intersection rule | One block in `compose.ts` |
+
+### Project Structure
+
+```
+src/
+├── tokens/
+│   ├── primitives.ts           Raw values — color ramps, spacing, typography, shadows
+│   ├── semantics.ts            Typed AppSemantics interface
+│   ├── paradigms.ts            Three paradigm factories
+│   └── profiles.ts             Four accessibility profile deltas
+├── compose/
+│   └── compose.ts              Pipeline: paradigm + profiles → AppSemantics
+├── context/
+│   ├── WeftConfigContext.tsx   Live config state + AsyncStorage persistence
+│   └── types.ts                Paradigm, AccessibilityProfile, WeftConfig types
+├── surfaces/
+│   ├── HomeScreen.tsx          App grid, clock widget, dock, pagination
+│   ├── ControlCenterScreen.tsx Pull-down control panel overlay
+│   ├── CustomizationScreen.tsx Paradigm picker + profile toggles + PreviewCard
+│   └── OnboardingScreen.tsx    First-launch paradigm selection
+├── components/
+│   ├── AppIcon.tsx             Spring press animation, shadow + clip split
+│   ├── ClockWidget.tsx         Live time/date with entrance animation
+│   ├── Dock.tsx                Bottom dock pill with elevation shadow
+│   ├── PreviewCard.tsx         Miniature live HomeScreen preview
+│   ├── SectionHeader.tsx       Label with optional backing plate + divider line
+│   ├── Tile.tsx                Control Center toggle tile
+│   ├── Toggle.tsx              Binary on/off control
+│   ├── Slider.tsx              Range input (brightness, volume)
+│   ├── WidgetCard.tsx          Widget container card
+│   └── WallpaperBackground.tsx System wallpaper + paradigm tint crossfade
+├── hooks/
+│   ├── useWeftConfig.ts        Typed context hook
+│   └── useInstalledApps.ts     Device app list + install/remove listener
+android/app/src/main/java/com/weft/
+├── WallpaperModule.kt          Reads system wallpaper as base64 JPEG
+├── WeftSystemUIModule.kt       Sets nav bar + status bar icon tints
+└── SetDefaultLauncherModule.kt RoleManager dialog for default home app
+```
 
 ---
 
 ## Prerequisites
 
-- **Node.js** ≥ 20.19.4
-- **Java JDK** 17 (Android builds require JDK 17 exactly — not 21)
-- **Android Studio** with SDK Platform 34 and Build Tools 34.0.0
-- **Android NDK** 26.1.10909125 (required by react-native-launcher-kit)
-- An Android device or emulator running API 29+ (Android 10+)
+| Requirement | Version |
+|---|---|
+| Node.js | ≥ 20.19.4 |
+| Java JDK | **17 exactly** — not 21 |
+| Android Studio | Latest stable |
+| Android SDK Platform | 34 |
+| Android Build Tools | 34.0.0 |
+| Android NDK | 26.1.10909125 |
+| Device / emulator | API 29+ (Android 10+) |
 
-Verify your environment first:
+Verify your setup:
 
 ```sh
 npx react-native doctor
@@ -20,225 +202,185 @@ npx react-native doctor
 
 ---
 
-## Setup
+## Setup & Running
 
 ### 1. Clone and install
 
 ```sh
-git clone <repo-url>
+git clone https://github.com/your-username/weft.git
 cd weft
 npm install
 ```
 
-`@react-native-async-storage/async-storage` and `@react-native-community/blur` are native modules — they require a full native build. Metro-only (`npm start`) is insufficient after installing these.
+`@react-native-async-storage/async-storage` and `@react-native-community/blur` are native modules — they require a full native build. `npm start` alone is not sufficient after a fresh install.
 
-### 2. Build and run on Android
-
-With a device connected or emulator running:
+### 2. Build and run
 
 ```sh
 npm run android
 ```
 
-This compiles the native layer, installs the APK, and starts Metro. The first build takes 3–5 minutes. Subsequent builds are faster.
+First build: 3–5 minutes. Subsequent builds are incremental.
 
-### 3. Set Weft as your default launcher (Android)
+### 3. Set Weft as default launcher
 
-After the app is installed:
+After the app installs, press **Home**. Android will show a **"Choose default launcher"** dialog — select **Weft → Always**.
 
-1. Press the **Home button** on your device
-2. Android will show a "Choose default launcher" dialog
-3. Select **Weft**
-4. Tap **Always**
+If the dialog doesn't appear automatically: **Settings → Apps → Default apps → Home app → Weft**
 
-If the dialog doesn't appear, go to **Settings → Apps → Default apps → Home app** and select Weft from the list.
-
-To reset to your original launcher: **Settings → Apps → Default apps → Home app** → select your previous launcher.
+To restore your previous launcher: same path, select the other launcher.
 
 ---
 
-## Project structure
+## Building a Release APK
 
-```
-src/
-  tokens/         # Three-tier design token system
-    primitives.ts   # Raw values (colors, spacing, typography, shadows)
-    semantics.ts    # Typed AppSemantics interface — the UI contract
-    paradigms.ts    # Three paradigm factories (skeuo, glass, minimal)
-    profiles.ts     # Four accessibility profile deltas
-  compose/
-    compose.ts      # Pipeline: paradigm + profiles → AppSemantics
-  context/
-    WeftConfigContext.tsx  # Live config state + AsyncStorage persistence
-    types.ts               # Paradigm, AccessibilityProfile, WeftConfig
-  surfaces/
-    HomeScreen.tsx          # App grid, dock, clock widget
-    ControlCenterScreen.tsx # Pull-down control panel
-    CustomizationScreen.tsx # Paradigm picker + profile toggles
-    OnboardingScreen.tsx    # First-launch paradigm selection
-  components/               # Atom library (Tile, Toggle, Slider, AppIcon…)
-  hooks/
-    useWeftConfig.ts        # Typed context hook
-    useInstalledApps.ts     # Device app list + install/remove listener
+### 1. Generate a signing keystore (once)
+
+```sh
+cd android
+keytool -genkeypair -v -storetype PKCS12 \
+  -keystore weft-release.keystore \
+  -alias weft \
+  -keyalg RSA -keysize 2048 -validity 10000
 ```
 
----
+### 2. Add signing credentials to `android/gradle.properties`
 
-## Demo script
+```properties
+MYAPP_RELEASE_STORE_FILE=weft-release.keystore
+MYAPP_RELEASE_KEY_ALIAS=weft
+MYAPP_RELEASE_STORE_PASSWORD=your_store_password
+MYAPP_RELEASE_KEY_PASSWORD=your_key_password
+```
 
-Full demo flow — all transitions run on device, no mock data.
+### 3. Configure signing in `android/app/build.gradle`
 
-### Setup (30 seconds before demo)
+```groovy
+signingConfigs {
+    release {
+        storeFile file(MYAPP_RELEASE_STORE_FILE)
+        storePassword MYAPP_RELEASE_STORE_PASSWORD
+        keyAlias MYAPP_RELEASE_KEY_ALIAS
+        keyPassword MYAPP_RELEASE_KEY_PASSWORD
+    }
+}
 
-1. Ensure Weft is set as the default launcher
-2. Press Home to confirm Weft loads
-3. If onboarding appears, select **Skeuomorphic** and tap **Get Started**
-4. Confirm the home screen shows the app grid and live clock
+buildTypes {
+    release {
+        signingConfig signingConfigs.release
+        minifyEnabled enableProguardInReleaseBuilds
+        proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+    }
+}
+```
 
----
+### 4. Build the APK
 
-### Step 1 — Home screen (Skeuomorphic)
+```sh
+cd android
+gradlew.bat assembleRelease
+```
 
-**Show:** The launcher home screen. Point out:
-- Live clock (top left, updates every second)
-- Real installed app icons pulled from the device
-- Dock at the bottom with pinned apps + Customise gear
+Output: `android/app/build/outputs/apk/release/app-release.apk`
 
-**Say:** *"This is Weft in Skeuomorphic mode — warm, tactile, depth-driven. Everything you see is driven by a token system, not hardcoded styles."*
+### 5. Install to device
 
----
+```sh
+adb install android/app/build/outputs/apk/release/app-release.apk
+```
 
-### Step 2 — Control Center
+> ⚠️ Never commit `weft-release.keystore` to version control. Add it to `.gitignore`.
 
-**Action:** Swipe down from the top of the screen.
-
-**Show:** Control Center slides in with 6 control tiles (Wi-Fi, Bluetooth, etc.) and 2 sliders (Brightness, Volume). Tap a tile to toggle it.
-
-**Say:** *"Standard launcher controls. The tint and layout are all token-driven."*
-
-**Action:** Swipe up or tap the scrim to dismiss.
-
----
-
-### Step 3 — Open Customization
-
-**Action:** Tap the **⚙ Customise** button in the dock.
-
-**Show:** The Customization screen slides up, showing all three paradigms as live miniature previews side by side — each rendering its own clock, icon grid, and dock in its own visual language.
-
-**Say:** *"This is the thesis surface. Three live previews — Skeuomorphic, Glass, Minimal — each composed from the same token architecture. Nothing is duplicated."*
-
----
-
-### Step 4 — Switch to Glass
-
-**Action:** Tap the **Glass** preview card.
-
-**Show:** The Glass card springs to full scale. The preview shows a dark wallpaper, frosted dock, white labels.
-
-**Say:** *"Glass: frosted translucency, cool blues, 22-pixel radii. The whole visual system — tile backgrounds, section headers, dock, shadows — switches through a single token recomposition."*
-
-**Action:** Tap **Apply**.
-
-**Show:** Home screen transitions to Glass paradigm — dark background, frosted dock, white icon labels.
+For an Android App Bundle (Play Store): `gradlew.bat bundleRelease`
 
 ---
 
-### Step 5 — Toggle Vision profile
+## Splash Screen
 
-**Action:** Open Customise again. With Glass selected, tap **Vision** in the Accessibility section.
+To add a launch logo:
 
-**Show:** The Glass preview card updates — notice the dock tint deepens, section headers change.
+1. Place your PNG at `android/app/src/main/res/drawable/splash_logo.png`
+2. The splash is already wired — it reads `@drawable/splash_logo` from `splash_background.xml`
+3. Rebuild with `npm run android`
 
-**Say:** *"Vision profile: larger type, maximum contrast. On Glass specifically there's a cascade rule — the container tint deepens to 92% opacity and decorative chrome (chips, plates) clears to zero, guaranteeing WCAG-grade contrast without a separate design."*
-
-**Action:** Apply.
-
----
-
-### Step 6 — Toggle One-Handed
-
-**Action:** Open Customise, toggle **One-Handed** (Vision still on).
-
-**Show:** Preview card shows the icon grid offset toward the right (thumb zone).
-
-**Say:** *"One-Handed shifts the grid toward the thumb zone. Profiles compose — Vision + One-Handed + Glass all apply simultaneously, each delta layering on top of the previous one in fixed order."*
-
-**Action:** Apply. Show the actual home screen with the grid shifted right.
+Adjust the displayed size in `android/app/src/main/res/drawable/splash_background.xml` by changing `android:width` / `android:height` (default: 120dp × 120dp).
 
 ---
 
-### Step 7 — Return to Skeuomorphic
+## Development Notes
 
-**Action:** Open Customise, tap **Skeuomorphic**, deselect all profiles, Apply.
+### Reset onboarding (dev only)
 
-**Show:** Home screen returns to warm parchment, soft shadows, amber accent.
+Open **Customise** → scroll to the bottom → tap **⚙ Dev: Reset onboarding**. This clears `AsyncStorage` and reloads the JS bundle. Only visible in `__DEV__` builds.
 
-**Say:** *"The entire UI recomposes — same components, same structure, completely different material language. No conditionals inside any component."*
+### Paradigm switching performance
 
----
+`setParadigm` and `toggleProfile` are wrapped in `InteractionManager.runAfterInteractions` so paradigm switches never block the touch animation that triggered them.
 
-### Step 8 — Minimal
+### Shadow rendering on Android
 
-**Action:** Open Customise, tap **Minimal**, Apply.
-
-**Show:** Near-black background, flat tiles, no shadows, sage green accent.
-
-**Say:** *"Minimal: flat, high-contrast, zero elevation. Same compose pipeline, different factory output."*
-
----
-
-### Demo complete
-
-Total time: ~4 minutes.
-
----
-
-## Fallback path
-
-If the device is unavailable or the build fails:
-
-1. Open the Figma prototype: *(link to be added)*
-2. The prototype mirrors the demo flow above — each step has a dedicated frame
-3. The token architecture and compose pipeline are fully visible in code regardless of device
+Android `elevation` requires a non-transparent `backgroundColor` on the view to render the shadow. All shadow-bearing views (app icons, dock) use a white opaque background on the shadow carrier, with the actual visual background rendered in a child view on top. This is documented in `AppIcon.tsx` and `Dock.tsx`.
 
 ---
 
 ## Troubleshooting
 
-**Build fails with NDK error**
-```
-Android NDK version 26.1.10909125 required
-```
-In Android Studio: SDK Manager → SDK Tools → NDK (Side by side) → install 26.1.10909125.
+**NDK build error: version 26.1.10909125 required**
+Android Studio → SDK Manager → SDK Tools → NDK (Side by side) → install 26.1.10909125.
 
-**"Choose launcher" dialog doesn't appear**
-The `HOME` intent filter in `AndroidManifest.xml` requires the app to be installed as a full APK (not via Expo Go or a dev build missing the manifest flag). Run `npm run android` directly.
+**Home button goes to old launcher**
+Settings → Apps → Default apps → Home app → select Weft. Or open Weft → Customise → the app will prompt you.
 
-**Blur effect not visible on Glass**
-`@react-native-community/blur` requires a full native rebuild after `npm install`. Run `npm run android` (not just Metro restart). On emulators, blur may render differently than physical devices — this is expected.
+**Blur not visible on Glass paradigm**
+`@react-native-community/blur` needs a full native rebuild. Run `npm run android`, not just a Metro restart. Blur behaves differently on emulators vs physical devices.
 
-**Icons show as blank on first launch**
-`QUERY_ALL_PACKAGES` permission is declared in `AndroidManifest.xml`. On Android 11+ a system dialog may appear requesting permission — grant it and return to the launcher.
+**Icons blank on first launch**
+Grant `QUERY_ALL_PACKAGES`. On Android 11+ a system permission dialog may appear — grant it and return.
 
-**AsyncStorage data persists between test runs**
-To reset onboarding: clear app data in Settings → Apps → Weft → Storage → Clear Data.
+**Wallpaper shows as gradient, not real photo**
+On emulators, no wallpaper is set by default. Go to emulator Settings → Wallpaper and set one. On physical devices this works automatically if `READ_WALLPAPER_INTERNAL` / `READ_EXTERNAL_STORAGE` permissions are granted.
+
+**White flash on launch**
+The splash theme (`SplashTheme` in `styles.xml`) should prevent this. If you see a flash, ensure `android:theme="@style/SplashTheme"` is set on the `<activity>` in `AndroidManifest.xml` and `setTheme(R.style.AppTheme)` is called in `MainActivity.onCreate` before `super.onCreate`.
 
 ---
 
-## Architecture notes
+## Native Modules
 
-The central insight of Weft's architecture:
+| Module | Purpose |
+|---|---|
+| `WallpaperModule` | Reads device wallpaper via `WallpaperManager`, returns base64 JPEG data URI |
+| `WeftSystemUIModule` | Sets nav bar + status bar icon tints via `WindowInsetsControllerCompat` |
+| `SetDefaultLauncherModule` | Triggers `RoleManager.ROLE_HOME` dialog on Android 10+, falls back to Settings on older |
 
-```
-compose(paradigm, activeProfiles) → AppSemantics
-```
+---
 
-Every component reads exclusively from `AppSemantics` via `useWeftConfig().semantics`. No component checks which paradigm is active or which profiles are on. The visual output of the entire app is determined by a single pure function call.
+## Fonts
 
-This means:
-- Adding a new paradigm = writing one factory function
-- Adding a new accessibility profile = writing one delta function  
-- Adding a new component = reading from existing semantic tokens
+Weft bundles three typefaces under `android/app/src/main/assets/fonts/`:
 
-The Glass × Vision cascade is the only exception — it's an intersection rule in `compose.ts` that fires when both conditions are true, and it's documented as such.
+| Font | Usage |
+|---|---|
+| **Inter** (variable) | UI labels, section headers, body copy, clock |
+| **Fraunces** (variable) | Display sizes, hero text, onboarding wordmark |
+| **JetBrains Mono** | Monospaced readouts |
+
+---
+
+## Tech Stack
+
+| Technology | Role |
+|---|---|
+| React Native 0.86 | Core framework, New Architecture enabled |
+| TypeScript 5 | Strict typing throughout the token system |
+| AsyncStorage | Config persistence across restarts |
+| react-native-launcher-kit | Installed app enumeration + launching |
+| react-native-safe-area-context | Edge-to-edge insets |
+| @react-native-community/blur | Glass paradigm frosted panel |
+| Kotlin | Three native modules for system-level features |
+
+---
+
+## License
+
+MIT

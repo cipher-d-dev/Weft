@@ -44,7 +44,8 @@
         android:taskAffinity=""
         android:windowSoftInputMode="adjustResize"
         android:exported="true"
-        android:stateNotNeeded="true">
+        android:stateNotNeeded="true"
+        android:theme="@style/SplashTheme">
         <!-- Standard app launcher intent — shows Weft in the app drawer -->
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
