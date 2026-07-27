@@ -383,7 +383,7 @@ Weft bundles three typefaces under `android/app/src/main/assets/fonts/`:
 
 ## Releases
 
-![Download_APK]|(https://github.com/cipher-d-dev/Weft/releases/download/luancher/app-release.apk)
+[Download APK](https://github.com/cipher-d-dev/Weft/releases/download/luancher/app-release.apk)
 
 ---
 
