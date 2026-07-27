@@ -3,8 +3,17 @@
 // uses std::format(), which Android's NDK libc++ does not implement.
 // This patches the extracted header in the Gradle cache before every CMake
 // configure, so it survives cache clears / clean checkouts / CI.
+//
+// Task name variants covered:
+//   configureCMakeDebug           — npm run android (debug)
+//   configureCMakeRelease         — assembleRelease (some RN versions)
+//   configureCMakeRelWithDebInfo  — assembleRelease (RN 0.86 actual name)
 gradle.projectsEvaluated {
-    tasks.matching { it.name.startsWith("configureCMakeDebug") || it.name.startsWith("configureCMakeRelease") }.all { t ->
+    tasks.matching { t ->
+        t.name.startsWith("configureCMakeDebug") ||
+        t.name.startsWith("configureCMakeRelease") ||
+        t.name.startsWith("configureCMakeRelWithDebInfo")
+    }.all { t ->
         t.doFirst {
             def gradleHome = gradle.gradleUserHomeDir
             fileTree(dir: gradleHome, include: "caches/**/prefab/modules/reactnative/include/react/renderer/core/graphicsConversions.h").each { f ->
