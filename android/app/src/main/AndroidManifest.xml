@@ -54,6 +54,15 @@
     <!-- WiFi state read — needed on Android 9 and below for getWifiEnabled(). -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- Read media images for gallery wallpaper picker (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        android:minSdkVersion="33" />
+
+    <!-- Notification listener — lets WeftNotificationListener read active
+         notifications for badge counts. The user must grant "Notification
+         access" in Settings → Apps → Special app access. -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -86,5 +95,19 @@
             <category android:name="android.intent.category.DEFAULT" />
         </intent-filter>
       </activity>
+
+      <!-- Notification listener service for badge counts.
+           android:permission ensures only the system can bind to it.
+           The meta-data tag declares which notification categories we want. -->
+      <service
+          android:name=".WeftNotificationListener"
+          android:label="Weft Notification Listener"
+          android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+          android:exported="true">
+          <intent-filter>
+              <action android:name="android.service.notification.NotificationListenerService" />
+          </intent-filter>
+      </service>
+
     </application>
 </manifest>

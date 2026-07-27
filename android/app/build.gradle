@@ -123,4 +123,7 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Palette API — used by WallpaperSetModule to extract dominant colors from bitmaps
+    implementation 'androidx.palette:palette:1.0.0'
 }

@@ -46,6 +46,7 @@ import { WeftConfigProvider } from './src/context/WeftConfigContext';
 import { HomeScreen } from './src/surfaces/HomeScreen';
 import { ControlCenterScreen } from './src/surfaces/ControlCenterScreen';
 import { CustomizationScreen } from './src/surfaces/CustomizationScreen';
+import { WallpaperPickerSheet } from './src/surfaces/WallpaperPickerSheet';
 import { OnboardingScreen, ONBOARDING_KEY } from './src/surfaces/OnboardingScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useAppState } from './src/hooks/useAppState';
@@ -83,6 +84,10 @@ function LauncherRoot({
   closeDrawer,
   drawerAnimValue,
   isDrawerOpen,
+  openWallpaperPicker,
+  closeWallpaperPicker,
+  wallpaperAnimValue,
+  isWallpaperPickerOpen,
 }: {
   openControlCenter: () => void;
   closeControlCenter: () => void;
@@ -92,6 +97,10 @@ function LauncherRoot({
   closeDrawer: () => void;
   drawerAnimValue: Animated.Value;
   isDrawerOpen: boolean;
+  openWallpaperPicker: () => void;
+  closeWallpaperPicker: () => void;
+  wallpaperAnimValue: Animated.Value;
+  isWallpaperPickerOpen: boolean;
 }) {
   const { justResumed } = useAppState();
 
@@ -116,6 +125,20 @@ function LauncherRoot({
           animValue={drawerAnimValue}
           onDismiss={closeDrawer}
           isOpen={isDrawerOpen}
+          onOpenWallpaperPicker={() => {
+            closeDrawer();
+            // Small delay so the customization sheet has begun closing
+            // before the wallpaper picker opens — avoids two sheets stacking.
+            setTimeout(openWallpaperPicker, 200);
+          }}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary name="WallpaperPicker">
+        <WallpaperPickerSheet
+          visible={isWallpaperPickerOpen}
+          animValue={wallpaperAnimValue}
+          onDismiss={closeWallpaperPicker}
+          onWallpaperSet={() => closeWallpaperPicker()}
         />
       </ErrorBoundary>
     </View>
@@ -222,13 +245,32 @@ export default function App(): React.JSX.Element {
     });
   }, [drawerAnimValue]);
 
+  // ── Wallpaper Picker ──────────────────────────────────────────────────────
+  const wallpaperAnimValue = useRef(new Animated.Value(0)).current;
+  const [isWallpaperPickerOpen, setIsWallpaperPickerOpen] = useState(false);
+
+  const openWallpaperPicker = useCallback(() => {
+    setIsWallpaperPickerOpen(true);
+    Animated.spring(wallpaperAnimValue, SPRING_OPEN).start();
+  }, [wallpaperAnimValue]);
+
+  const closeWallpaperPicker = useCallback(() => {
+    Animated.spring(wallpaperAnimValue, SPRING_CLOSE).start(() => {
+      setIsWallpaperPickerOpen(false);
+    });
+  }, [wallpaperAnimValue]);
+
   // ── Back handler — only active when the launcher is visible ───────────────
-  // Drawer takes priority (higher z-index) over Control Center.
+  // Wallpaper picker > drawer (higher z-index) > Control Center.
   useEffect(() => {
     // Don't intercept back while onboarding or splash is shown.
     if (!hasOnboarded) return;
 
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isWallpaperPickerOpen) {
+        closeWallpaperPicker();
+        return true;
+      }
       if (isDrawerOpen) {
         closeDrawer();
         return true;
@@ -240,7 +282,7 @@ export default function App(): React.JSX.Element {
       return false;
     });
     return () => sub.remove();
-  }, [hasOnboarded, isOpen, isDrawerOpen, closeControlCenter, closeDrawer]);
+  }, [hasOnboarded, isOpen, isDrawerOpen, isWallpaperPickerOpen, closeControlCenter, closeDrawer, closeWallpaperPicker]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -268,6 +310,10 @@ export default function App(): React.JSX.Element {
             closeDrawer={closeDrawer}
             drawerAnimValue={drawerAnimValue}
             isDrawerOpen={isDrawerOpen}
+            openWallpaperPicker={openWallpaperPicker}
+            closeWallpaperPicker={closeWallpaperPicker}
+            wallpaperAnimValue={wallpaperAnimValue}
+            isWallpaperPickerOpen={isWallpaperPickerOpen}
           />
         )}
       </WeftConfigProvider>

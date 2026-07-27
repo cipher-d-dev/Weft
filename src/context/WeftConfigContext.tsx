@@ -10,7 +10,17 @@ import { InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { compose } from '../compose/compose';
 import { DEFAULT_CONFIG } from './types';
-import type { AccessibilityProfile, Paradigm, WeftConfig } from './types';
+import type {
+  AccessibilityProfile,
+  FontConfig,
+  GestureAction,
+  GestureBindings,
+  IconConfig,
+  Paradigm,
+  WeftConfig,
+  WallpaperConfig,
+  WidgetConfig,
+} from './types';
 import type { AppSemantics } from '../tokens/semantics';
 
 /** AsyncStorage key used to persist the user's Weft configuration. */
@@ -27,6 +37,16 @@ export type WeftConfigContextValue = {
   paradigm: Paradigm;
   /** List of active accessibility overrides. */
   activeProfiles: AccessibilityProfile[];
+  /** Current icon customization config. */
+  icons: IconConfig;
+  /** Current typography customization config. */
+  font: FontConfig;
+  /** Current wallpaper configuration. */
+  wallpaper: WallpaperConfig;
+  /** Active widgets with their order and settings. */
+  widgets: WidgetConfig[];
+  /** Gesture bindings for 4 swipe directions. */
+  gestures: GestureBindings;
   /**
    * True once the persisted config has been read from AsyncStorage (or the
    * read has failed gracefully).  Use this to gate rendering in App.tsx so
@@ -37,6 +57,20 @@ export type WeftConfigContextValue = {
   setParadigm: (paradigm: Paradigm) => void;
   /** Toggle an accessibility profile on/off and persist the change. */
   toggleProfile: (profile: AccessibilityProfile) => void;
+  /** Merge a partial IconConfig into the current icons config. */
+  setIcons: (icons: Partial<IconConfig>) => void;
+  /** Merge a partial FontConfig into the current font config. */
+  setFont: (font: Partial<FontConfig>) => void;
+  /** Merge a partial WallpaperConfig into the current wallpaper config. */
+  setWallpaper: (wallpaper: Partial<WallpaperConfig>) => void;
+  /** Enable or disable a widget. */
+  setWidgetEnabled: (id: string, enabled: boolean) => void;
+  /** Update widget-specific settings. */
+  setWidgetSettings: (id: string, settings: Record<string, any>) => void;
+  /** Reorder widgets by providing new order array. */
+  reorderWidgets: (newOrder: string[]) => void;
+  /** Update a gesture binding. */
+  setGestureBinding: (direction: keyof GestureBindings, action: GestureAction) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -177,6 +211,75 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
     });
   }, []);
 
+  const setIcons = useCallback((icons: Partial<IconConfig>) => {
+    setConfig(prev => ({ ...prev, icons: { ...prev.icons, ...icons } }));
+  }, []);
+
+  const setFont = useCallback((font: Partial<FontConfig>) => {
+    setConfig(prev => ({ ...prev, font: { ...prev.font, ...font } }));
+  }, []);
+
+  const setWallpaper = useCallback((wallpaper: Partial<WallpaperConfig>) => {
+    setConfig(prev => ({ ...prev, wallpaper: { ...prev.wallpaper, ...wallpaper } }));
+  }, []);
+
+  const setWidgetEnabled = useCallback((id: string, enabled: boolean) => {
+    setConfig(prev => {
+      const existing = prev.widgets.find(w => w.id === id);
+      if (existing) {
+        // Update existing widget
+        return {
+          ...prev,
+          widgets: prev.widgets.map(w => w.id === id ? { ...w, enabled } : w),
+        };
+      } else {
+        // Add new widget
+        const maxOrder = prev.widgets.reduce((max, w) => Math.max(max, w.order), -1);
+        return {
+          ...prev,
+          widgets: [
+            ...prev.widgets,
+            { id, enabled, order: maxOrder + 1, settings: {} },
+          ],
+        };
+      }
+    });
+  }, []);
+
+  const setWidgetSettings = useCallback((id: string, settings: Record<string, any>) => {
+    setConfig(prev => ({
+      ...prev,
+      widgets: prev.widgets.map(w =>
+        w.id === id ? { ...w, settings: { ...w.settings, ...settings } } : w
+      ),
+    }));
+  }, []);
+
+  const reorderWidgets = useCallback((newOrder: string[]) => {
+    setConfig(prev => {
+      const widgetMap = new Map(prev.widgets.map(w => [w.id, w]));
+      return {
+        ...prev,
+        widgets: newOrder
+          .map((id, index) => {
+            const widget = widgetMap.get(id);
+            return widget ? { ...widget, order: index } : null;
+          })
+          .filter((w): w is WidgetConfig => w !== null),
+      };
+    });
+  }, []);
+
+  const setGestureBinding = useCallback(
+    (direction: keyof GestureBindings, action: GestureAction) => {
+      setConfig(prev => ({
+        ...prev,
+        gestures: { ...prev.gestures, [direction]: action },
+      }));
+    },
+    []
+  );
+
   // -------------------------------------------------------------------------
   // Context value (memoised to avoid unnecessary re-renders downstream)
   // -------------------------------------------------------------------------
@@ -186,17 +289,41 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       semantics,
       paradigm: config.paradigm,
       activeProfiles: config.activeProfiles,
+      icons: config.icons,
+      font: config.font,
+      wallpaper: config.wallpaper,
+      widgets: config.widgets,
+      gestures: config.gestures,
       isHydrated,
       setParadigm,
       toggleProfile,
+      setIcons,
+      setFont,
+      setWallpaper,
+      setWidgetEnabled,
+      setWidgetSettings,
+      reorderWidgets,
+      setGestureBinding,
     }),
     [
       semantics,
       config.paradigm,
       config.activeProfiles,
+      config.icons,
+      config.font,
+      config.wallpaper,
+      config.widgets,
+      config.gestures,
       isHydrated,
       setParadigm,
       toggleProfile,
+      setIcons,
+      setFont,
+      setWallpaper,
+      setWidgetEnabled,
+      setWidgetSettings,
+      reorderWidgets,
+      setGestureBinding,
     ],
   );
 

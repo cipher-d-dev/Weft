@@ -29,10 +29,9 @@ import {
   Animated,
   BackHandler,
   Dimensions,
-  Easing,
   FlatList,
   Image,
-  PanResponder,
+  Linking,
   StatusBar,
   StyleSheet,
   Text,
@@ -45,11 +44,17 @@ import type { AppDetail } from 'react-native-launcher-kit/lib/typescript/interfa
 
 import { useWeftConfig } from '../hooks/useWeftConfig';
 import { useInstalledApps } from '../hooks/useInstalledApps';
+import { useNotificationBadges } from '../hooks/useNotificationBadges';
+import { useGestureHandler } from '../hooks/useGestureHandler';
 import { AppIcon } from '../components/AppIcon';
+import { AppContextMenu } from '../components/AppContextMenu';
+import { AppGridSkeleton } from '../components/AppGridSkeleton';
 import { Dock } from '../components/Dock';
 import { SectionHeader } from '../components/SectionHeader';
 import { WallpaperBackground } from '../components/WallpaperBackground';
 import { ClockWidget } from '../components/ClockWidget';
+import { WidgetSlot } from '../components/WidgetSlot';
+import { AllAppsScreen } from './AllAppsScreen';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -75,10 +80,16 @@ const AppGridItem = React.memo(function AppGridItem({
   app,
   iconSize,
   cellWidth,
+  badgeCount,
+  editMode,
+  onLongPress,
 }: {
   app: AppDetail;
   iconSize: number;
   cellWidth: number;
+  badgeCount: number;
+  editMode: boolean;
+  onLongPress?: (position: { x: number; y: number; width: number; height: number }) => void;
 }) {
   const handlePress = useCallback(() => {
     RNLauncherKitHelper.launchApplication(app.packageName);
@@ -96,6 +107,9 @@ const AppGridItem = React.memo(function AppGridItem({
         }
         label={app.label}
         onPress={handlePress}
+        onLongPressPosition={onLongPress}
+        editMode={editMode}
+        badgeCount={badgeCount}
       />
     </View>
   );
@@ -104,8 +118,10 @@ const AppGridItem = React.memo(function AppGridItem({
 /** Dock slot — resolves pinned apps, falls back to first 4 if none found. */
 function DockApps({
   allApps,
+  badges,
 }: {
   allApps: AppDetail[];
+  badges: Map<string, number>;
 }) {
   const dockApps = useMemo(() => {
     const byPackage = new Map(allApps.map(a => [a.packageName, a]));
@@ -113,8 +129,6 @@ function DockApps({
       .map(pkg => byPackage.get(pkg))
       .filter((a): a is AppDetail => a !== undefined);
 
-    // If none of the pinned packages are installed (common on emulators
-    // which use different package names), fall back to the first 4 apps.
     if (pinned.length === 0 && allApps.length > 0) {
       return allApps.slice(0, 4);
     }
@@ -137,6 +151,7 @@ function DockApps({
             }
             label={app.label}
             onPress={handlePress}
+            badgeCount={badges.get(app.packageName) ?? 0}
           />
         );
       })}
@@ -249,134 +264,6 @@ function PageDots({
 }
 
 // ---------------------------------------------------------------------------
-// SkeletonGrid — placeholder shown while apps load
-// ---------------------------------------------------------------------------
-// SkeletonGrid — left-to-right shimmer placeholder while apps load
-// ---------------------------------------------------------------------------
-
-/**
- * Each skeleton cell has a base muted color. A bright shimmer stripe
- * (a narrow white View) translates from -cellWidth to +cellWidth repeatedly,
- * creating the classic left-to-right shimmer effect.
- * All cells share the same translateX anim so they shimmer in sync.
- */
-function SkeletonCell({
-  width,
-  height,
-  borderRadius,
-  baseColor,
-  shimmerX,
-}: {
-  width: number;
-  height: number;
-  borderRadius: number;
-  baseColor: string;
-  shimmerX: Animated.Value;
-}) {
-  return (
-    <View
-      style={{
-        width,
-        height,
-        borderRadius,
-        backgroundColor: baseColor,
-        overflow: 'hidden',
-      }}
-    >
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          width: width * 0.5,
-          backgroundColor: 'rgba(255,255,255,0.18)',
-          transform: [{ translateX: shimmerX }],
-        }}
-      />
-    </View>
-  );
-}
-
-function SkeletonGrid({
-  columns,
-  screenWidth,
-  paddingH,
-  gap,
-  iconSize,
-  accentColor,
-  topInset,
-  dockClearance,
-}: {
-  columns: number;
-  screenWidth: number;
-  paddingH: number;
-  gap: number;
-  iconSize: number;
-  accentColor: string;
-  topInset: number;
-  dockClearance: number;
-}) {
-  const shimmerX = useRef(new Animated.Value(-iconSize)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(shimmerX, {
-        toValue: iconSize * 1.5,
-        duration: 1200,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    ).start();
-    return () => shimmerX.stopAnimation();
-  }, [shimmerX, iconSize]);
-
-  const cellWidth = (screenWidth - paddingH * 2 - gap * (columns - 1)) / columns;
-  const ROWS = 3;
-  const cells = Array.from({ length: columns * ROWS });
-  // Muted version of accent — skeleton base color
-  const baseColor = `${accentColor}28`; // ~16% opacity
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        paddingTop: topInset + 80,
-        paddingHorizontal: paddingH,
-        paddingBottom: dockClearance,
-      }}
-    >
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
-        {cells.map((_, i) => (
-          <View
-            key={i}
-            style={{
-              width: cellWidth,
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <SkeletonCell
-              width={iconSize}
-              height={iconSize}
-              borderRadius={14}
-              baseColor={baseColor}
-              shimmerX={shimmerX}
-            />
-            <SkeletonCell
-              width={iconSize * 0.6}
-              height={7}
-              borderRadius={4}
-              baseColor={baseColor}
-              shimmerX={shimmerX}
-            />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // HomeScreen
 // ---------------------------------------------------------------------------
 
@@ -385,6 +272,8 @@ type HomeScreenProps = {
   onOpenControlCenter?: () => void;
   /** Called when the user taps the customize gear in the dock. */
   onOpenCustomization?: () => void;
+  /** Called when the All Apps drawer should open (swipe-up gesture). */
+  onOpenAllApps?: () => void;
   /**
    * Passed a new timestamp by App.tsx whenever the app resumes from background.
    * HomeScreen passes it as the key to WallpaperBackground, forcing a re-read
@@ -394,10 +283,11 @@ type HomeScreenProps = {
   resumeKey?: number;
 };
 
-export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey = 0 }: HomeScreenProps): React.JSX.Element {
+export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAllApps, resumeKey = 0 }: HomeScreenProps): React.JSX.Element {
   const { semantics, paradigm } = useWeftConfig();
   const insets = useSafeAreaInsets();
   const { apps, loading, error } = useInstalledApps();
+  const { badges, clearBadge } = useNotificationBadges();
 
   const s = semantics;
   const layout = s.layout;
@@ -405,36 +295,82 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
   // ── Current page tracking ─────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(0);
 
+  // ── Edit mode ─────────────────────────────────────────────────────────────
+  const [editMode, setEditMode] = useState(false);
+
+  // ── Scroll position for parallax ─────────────────────────────────────────
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  // ── All Apps drawer ───────────────────────────────────────────────────────
+  const allAppsAnim = useRef(new Animated.Value(0)).current;
+  const [isAllAppsOpen, setIsAllAppsOpen] = useState(false);
+
+  // ── Context menu state ────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    packageName: string;
+    appLabel: string;
+    isSystemApp: boolean;
+    anchorPosition: { x: number; y: number; width: number; height: number } | null;
+  } | null>(null);
+
   // ── Back handler ──────────────────────────────────────────────────────────
   // Launchers must swallow the back button — returning true suppresses exit.
+  // Edit mode exits on back press before passing through.
   useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (editMode) {
+        setEditMode(false);
+        return true;
+      }
+      return true;
+    });
     return () => sub.remove();
+  }, [editMode]);
+
+  // ── All Apps handlers ─────────────────────────────────────────────────────
+  const openAllApps = useCallback(() => {
+    setIsAllAppsOpen(true);
+    Animated.spring(allAppsAnim, {
+      toValue: 1,
+      tension: 140,
+      friction: 18,
+      useNativeDriver: true,
+    }).start();
+  }, [allAppsAnim]);
+
+  const closeAllApps = useCallback(() => {
+    Animated.spring(allAppsAnim, {
+      toValue: 0,
+      tension: 160,
+      friction: 20,
+      useNativeDriver: true,
+    }).start(() => setIsAllAppsOpen(false));
+  }, [allAppsAnim]);
+
+  // ── Context menu handlers ─────────────────────────────────────────────────
+  const handleIconLongPress = useCallback((
+    app: AppDetail,
+    position: { x: number; y: number; width: number; height: number },
+  ) => {
+    setContextMenu({
+      visible: true,
+      packageName: app.packageName,
+      appLabel: app.label,
+      isSystemApp: false, // react-native-launcher-kit doesn't expose this; default false
+      anchorPosition: position,
+    });
   }, []);
 
-  // ── Swipe-down gesture — opens Control Center ─────────────────────────────
-  // We watch for a downward drag that starts within the top-zone (status bar +
-  // insets area, roughly the top 80dp) and travels at least 40dp downward.
-  // The gesture is only claimed if dy > |dx| (more vertical than horizontal).
-  const onOpenRef = useRef(onOpenControlCenter);
-  onOpenRef.current = onOpenControlCenter;
+  const dismissContextMenu = useCallback(() => {
+    setContextMenu(prev => (prev ? { ...prev, visible: false } : null));
+  }, []);
 
-  const swipeGesture = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        const { dy, dx, moveY } = gestureState;
-        // Only claim downward swipes starting near the top of the screen
-        const startedNearTop = moveY < 120;
-        const isDownward = dy > 40 && dy > Math.abs(dx) * 1.5;
-        return startedNearTop && isDownward;
-      },
-      onPanResponderRelease: (_evt, gestureState) => {
-        if (gestureState.dy > 40) {
-          onOpenRef.current?.();
-        }
-      },
-    }),
-  ).current;
+  // ── Gesture handler — 4-direction swipes with configurable bindings ──────
+  const gestureHandler = useGestureHandler({
+    onOpenControlCenter,
+    onOpenAllApps: openAllApps,
+  });
 
   // ── Layout math ───────────────────────────────────────────────────────────
   // One-Handed profile: thumbSide biases padding left or right.
@@ -512,6 +448,7 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
           {pageIndex === 0 && (
             <View style={{ marginBottom: layout.sectionGap }}>
               <ClockWidget />
+              <WidgetSlot />
               <View style={{ marginTop: layout.sectionGap * 0.5 }}>
                 <SectionHeader label="Apps" />
               </View>
@@ -531,6 +468,9 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
                     app={app}
                     iconSize={iconSize}
                     cellWidth={cellWidth}
+                    badgeCount={badges.get(app.packageName) ?? 0}
+                    editMode={editMode}
+                    onLongPress={(pos) => handleIconLongPress(app, pos)}
                   />
                 ))}
                 {/* Fill trailing empty cells in the last row */}
@@ -554,6 +494,9 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
       layout.sectionGap,
       iconSize,
       cellWidth,
+      badges,
+      editMode,
+      handleIconLongPress,
     ],
   );
 
@@ -561,12 +504,16 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <View
+    <TouchableOpacity
       style={[styles.root, { backgroundColor: 'transparent' }]}
-      {...swipeGesture.panHandlers}
+      activeOpacity={1}
+      onLongPress={() => { if (!editMode) setEditMode(true); }}
+      delayLongPress={600}
+      accessible={false}
+      {...gestureHandler.panHandlers}
     >
       {/* ── Wallpaper layer — sits behind all content ──────────────── */}
-      <WallpaperBackground key={resumeKey || undefined} screenWidth={SCREEN_WIDTH} />
+      <WallpaperBackground key={resumeKey || undefined} screenWidth={SCREEN_WIDTH} scrollX={scrollX} />
 
       <StatusBar
         backgroundColor="transparent"
@@ -576,15 +523,12 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
 
       {/* ── Loading state — skeleton grid ─────────────────────────────── */}
       {loading && (
-        <SkeletonGrid
-          columns={layout.gridColumns}
+        <AppGridSkeleton
           screenWidth={SCREEN_WIDTH}
-          paddingH={layout.screenPaddingH}
-          gap={layout.gridGap}
-          iconSize={iconSize}
-          accentColor={s.accent.primary}
+          paddingLeft={paddingLeft}
+          paddingRight={paddingRight}
           topInset={insets.top}
-          dockClearance={dockClearance}
+          bottomInset={insets.bottom}
         />
       )}
 
@@ -622,7 +566,13 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onScroll={handlePageScroll}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            {
+              useNativeDriver: false,
+              listener: handlePageScroll,
+            },
+          )}
           scrollEventThrottle={16}
           style={styles.pageFlatList}
           // Re-mount when column count changes (Cognitive profile: 4→3 columns)
@@ -642,8 +592,8 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
         />
       )}
 
-      {/* ── Floating customise pill — above the dock ──────────────────── */}
-      {!loading && (
+      {/* ── Floating customise pill — hidden in edit mode ─────────────── */}
+      {!loading && !editMode && (
         <FloatingCustomiseButton
           onPress={onOpenCustomization}
           dockHeight={s.component.dock.height}
@@ -652,11 +602,88 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey
         />
       )}
 
+      {/* ── Edit mode Done button — replaces customise pill ───────────── */}
+      {!loading && editMode && (
+        <TouchableOpacity
+          onPress={() => setEditMode(false)}
+          style={[
+            styles.editDoneBtn,
+            {
+              bottom: insets.bottom + s.component.dock.height + 8,
+              backgroundColor: s.accent.primary,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Done editing"
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.editDoneBtnText, { color: s.accent.onAccent }]}>
+            Done
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* ── Dock — always rendered, even during app list refresh ─────── */}
       <Dock style={{ paddingBottom: insets.bottom }}>
-        <DockApps allApps={apps} />
+        <DockApps allApps={apps} badges={badges} />
       </Dock>
-    </View>
+
+      {/* ── Swipe-up handle — hints at the All Apps drawer ────────────── */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.swipeHandle,
+          { bottom: insets.bottom + s.component.dock.height + 6 },
+        ]}
+      >
+        <View
+          style={[
+            styles.swipeHandlePill,
+            { backgroundColor: s.surface.home.textSecondary },
+          ]}
+        />
+      </View>
+
+      {/* ── All Apps Drawer ───────────────────────────────────────────── */}
+      <AllAppsScreen
+        animValue={allAppsAnim}
+        isOpen={isAllAppsOpen}
+        onDismiss={closeAllApps}
+        apps={apps}
+      />
+
+      {/* ── App Context Menu ──────────────────────────────────────────── */}
+      {contextMenu && (
+        <AppContextMenu
+          visible={contextMenu.visible}
+          packageName={contextMenu.packageName}
+          appLabel={contextMenu.appLabel}
+          isSystemApp={contextMenu.isSystemApp}
+          anchorPosition={contextMenu.anchorPosition}
+          onDismiss={dismissContextMenu}
+          onOpen={() => {
+            RNLauncherKitHelper.launchApplication(contextMenu.packageName);
+            dismissContextMenu();
+          }}
+          onAppInfo={async () => {
+            try {
+              await Linking.openURL(
+                `android-app://com.android.settings/com.android.settings.applications.InstalledAppDetails?inspecting_package=${contextMenu.packageName}`,
+              );
+            } catch {
+              await Linking.openSettings();
+            }
+            dismissContextMenu();
+          }}
+          onUninstall={async () => {
+            await Linking.openURL(`package:${contextMenu.packageName}`);
+            dismissContextMenu();
+          }}
+          onAddToDock={() => dismissContextMenu()}
+          onRemoveFromHome={() => dismissContextMenu()}
+        />
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -763,5 +790,32 @@ const styles = StyleSheet.create({
   emptySub: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  // ── Swipe-up handle ──
+  swipeHandle: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    // `bottom` applied inline using insets + dock height
+  },
+  swipeHandlePill: {
+    width: 32,
+    height: 3,
+    borderRadius: 2,
+    opacity: 0.35,
+  },
+  // ── Edit mode ──
+  editDoneBtn: {
+    position: 'absolute',
+    alignSelf: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  editDoneBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

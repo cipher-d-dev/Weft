@@ -23,6 +23,14 @@ class MainApplication : Application(), ReactApplication {
                     add(SetDefaultLauncherPackage())
                     // WeftControlModule — brightness, volume, wifi, bt, DND, flashlight, airplane
                     add(WeftControlPackage())
+                    // WallpaperSetModule — sets system wallpaper + extracts dominant color
+                    add(WallpaperSetPackage())
+                    // IconPackModule — discovers icon packs and loads icons from them
+                    add(IconPackPackage())
+                    // NotificationBadgeModule — reads active notification counts for badge display
+                    add(NotificationBadgePackage())
+                    // SystemGesturesModule — expands notifications/quick settings, shows recent apps
+                    add(SystemGesturesPackage())
                 },
         )
     }

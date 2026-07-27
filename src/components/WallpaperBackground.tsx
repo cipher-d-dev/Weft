@@ -45,6 +45,12 @@ const { WallpaperModule, WeftSystemUI } = NativeModules;
 
 type WallpaperBackgroundProps = {
   screenWidth?: number;
+  /**
+   * Animated.Value from the horizontal page FlatList scroll position.
+   * When provided the wallpaper translates at -scrollX * 0.15 for a subtle
+   * parallax depth effect.
+   */
+  scrollX?: Animated.Value;
 };
 
 // ---------------------------------------------------------------------------
@@ -98,6 +104,7 @@ const PARADIGM_STYLES: Record<'glass' | 'skeuo' | 'minimal', ParadigmStyle> = {
 
 export const WallpaperBackground = memo(function WallpaperBackground({
   screenWidth = 393,
+  scrollX,
 }: WallpaperBackgroundProps) {
   const { paradigm } = useWeftConfig();
   const def = PARADIGM_STYLES[paradigm];
@@ -195,9 +202,25 @@ export const WallpaperBackground = memo(function WallpaperBackground({
   const hlTop = -(hlSize * 0.15);
   const hlLeft = (screenWidth - hlSize) / 2;
 
+  // Parallax: wallpaper translates at 15% of the page scroll speed in the
+  // opposite direction — subtle depth as the user swipes between pages.
+  const parallaxX = scrollX
+    ? scrollX.interpolate({
+        inputRange: [0, screenWidth],
+        outputRange: [0, -screenWidth * 0.15],
+        extrapolate: 'extend',
+      })
+    : null;
+
   return (
     <Animated.View
-      style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          opacity: fadeAnim,
+          transform: parallaxX ? [{ translateX: parallaxX }] : [],
+        },
+      ]}
     >
       {wallpaperUri ? (
         /* ── Real system wallpaper ─────────────────────────────────── */

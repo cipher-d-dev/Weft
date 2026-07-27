@@ -185,6 +185,58 @@ export type GlassContainerTokens = {
   radius: SizeToken;
 };
 
+export type ContextMenuTokens = {
+  background: ColorToken;
+  border: ColorToken;
+  radius: SizeToken;
+  itemHeight: SizeToken;
+  itemPaddingH: SizeToken;
+  labelColor: ColorToken;
+  labelType: TypographyToken;
+  dividerColor: ColorToken;
+  destructiveColor: ColorToken;
+  shadow: ShadowToken;
+};
+
+export type AllAppsTokens = {
+  background: ColorToken;
+  searchBarBackground: ColorToken;
+  searchBarBorder: ColorToken;
+  searchBarText: ColorToken;
+  searchBarPlaceholder: ColorToken;
+  handleColor: ColorToken;
+  indexBarText: ColorToken;
+  indexBarActiveText: ColorToken;
+  sectionHeaderText: ColorToken;
+};
+
+export type WallpaperPickerTokens = {
+  background: ColorToken;
+  cardBackground: ColorToken;
+  cardRadius: SizeToken;
+  selectedBorder: ColorToken;
+  selectedBorderWidth: SizeToken;
+  categoryChipBackground: ColorToken;
+  categoryChipText: ColorToken;
+  searchBarBackground: ColorToken;
+  searchBarText: ColorToken;
+};
+
+export type NotificationBadgeTokens = {
+  /** Badge background — the red/accent pill or dot. */
+  background: ColorToken;
+  /** Text color inside the badge. */
+  textColor: ColorToken;
+  /** Font size for the count number. */
+  fontSize: SizeToken;
+  /** Diameter of the dot (no count) / height of the pill (with count). */
+  size: SizeToken;
+  /** Border around the badge — white in skeuo, dark ring in glass/minimal. */
+  borderColor: ColorToken;
+  /** Border width. */
+  borderWidth: SizeToken;
+};
+
 // ---------------------------------------------------------------------------
 // Tile interaction states
 // ---------------------------------------------------------------------------
@@ -207,6 +259,8 @@ export type AppSemantics = {
     home: SurfaceTokens;
     controlCenter: SurfaceTokens;
     customization: SurfaceTokens;
+    allApps: AllAppsTokens;
+    wallpaperPicker: WallpaperPickerTokens;
   };
 
   // ── Components ────────────────────────────────────────────────────────────
@@ -223,6 +277,8 @@ export type AppSemantics = {
      * minimal set this to null; compose.ts consumers must check before using.
      */
     glassContainer: GlassContainerTokens | null;
+    contextMenu: ContextMenuTokens;
+    notificationBadge: NotificationBadgeTokens;
   };
 
   // ── State overrides ───────────────────────────────────────────────────────

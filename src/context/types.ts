@@ -36,6 +36,81 @@ export type Paradigm = 'glass' | 'skeuo' | 'minimal';
 export type AccessibilityProfile = 'motor' | 'vision' | 'cognitive' | 'oneHanded';
 
 // ---------------------------------------------------------------------------
+// Icon customization
+// ---------------------------------------------------------------------------
+
+/** Shape variants available in the icon shape picker. */
+export type IconShape = 'squircle' | 'circle' | 'rounded-square' | 'teardrop' | 'hexagon';
+
+/** Icon customization config. */
+export type IconConfig = {
+  size: number;                    // dp, range 48–80, default 60
+  shape: IconShape;
+  packPackageName: string | null;  // null = use system icons
+  labelVisible: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// Typography customization
+// ---------------------------------------------------------------------------
+
+/** Font family choices available in the picker. */
+export type FontChoice = 'inter' | 'fraunces' | 'jetbrains-mono' | 'system';
+
+/** Typography customization config. */
+export type FontConfig = {
+  family: FontChoice;
+  scale: number;  // 0.85–1.3, multiplier applied to all type sizes
+};
+
+// ---------------------------------------------------------------------------
+// Wallpaper
+// ---------------------------------------------------------------------------
+
+/** Where the wallpaper originates from. */
+export type WallpaperSource = 'system' | 'gallery' | 'unsplash' | 'bundled';
+
+/** Wallpaper configuration. */
+export type WallpaperConfig = {
+  source: WallpaperSource;
+  uri?: string;           // local file URI or Unsplash photo URI
+  dominantColor?: string; // hex color extracted by Palette API
+};
+
+// ---------------------------------------------------------------------------
+// Widgets
+// ---------------------------------------------------------------------------
+
+/** Individual widget instance configuration. */
+export type WidgetConfig = {
+  id: string;           // e.g. 'weather', 'calendar', 'quicknotes'
+  enabled: boolean;
+  order: number;        // 0-indexed position in the widget stack
+  settings: Record<string, any>; // widget-specific config (location, note text, etc.)
+};
+
+// ---------------------------------------------------------------------------
+// Gestures
+// ---------------------------------------------------------------------------
+
+/** Actions that can be bound to swipe gestures. */
+export type GestureAction =
+  | 'none'
+  | 'controlCenter'
+  | 'allApps'
+  | 'notifications'         // Android notification shade
+  | 'quickSettings'         // Android quick settings panel
+  | 'recentApps';           // Recent apps switcher
+
+/** Gesture bindings for 4 swipe directions. */
+export type GestureBindings = {
+  swipeDown: GestureAction;
+  swipeUp: GestureAction;
+  swipeLeft: GestureAction;
+  swipeRight: GestureAction;
+};
+
+// ---------------------------------------------------------------------------
 // WeftConfig
 // ---------------------------------------------------------------------------
 
@@ -46,6 +121,11 @@ export type AccessibilityProfile = 'motor' | 'vision' | 'cognitive' | 'oneHanded
 export type WeftConfig = {
   paradigm: Paradigm;
   activeProfiles: AccessibilityProfile[];
+  icons: IconConfig;
+  font: FontConfig;
+  wallpaper: WallpaperConfig;
+  widgets: WidgetConfig[];
+  gestures: GestureBindings;
 };
 
 // ---------------------------------------------------------------------------
@@ -55,4 +135,24 @@ export type WeftConfig = {
 export const DEFAULT_CONFIG: WeftConfig = {
   paradigm: 'skeuo',
   activeProfiles: [],
+  icons: {
+    size: 60,
+    shape: 'squircle',
+    packPackageName: null,
+    labelVisible: true,
+  },
+  font: {
+    family: 'inter',
+    scale: 1.0,
+  },
+  wallpaper: {
+    source: 'system',
+  },
+  widgets: [],
+  gestures: {
+    swipeDown: 'controlCenter',
+    swipeUp: 'allApps',
+    swipeLeft: 'none',
+    swipeRight: 'none',
+  },
 };

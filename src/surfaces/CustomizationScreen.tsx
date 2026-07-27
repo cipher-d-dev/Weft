@@ -1,39 +1,32 @@
 /**
  * Weft — CustomizationScreen
  *
- * Phase 6: The thesis-proving screen. Full-screen overlay that replaces
- * CustomizationDrawer. Lets the user pick a paradigm and toggle accessibility
- * profiles while watching a live PreviewCard update in real time.
+ * Phase 6 + Sprint 2: Paradigm picker, accessibility profiles, wallpaper
+ * entry row, and icon size/shape pickers.
  *
  * Layout (bottom sheet, slides up from bottom, full height):
  *   ┌────────────────────────────────────────────────┐
  *   │  ← close button           Customise            │
  *   │                                                 │
- *   │  ┌──────────┐ ┌──────────┐ ┌──────────┐        │
- *   │  │ Skeuo    │ │  Glass   │ │ Minimal  │        │
- *   │  │ preview  │ │ preview  │ │ preview  │        │  ← 3 PreviewCards
- *   │  │          │ │          │ │          │        │
- *   │  └──────────┘ └──────────┘ └──────────┘        │
- *   │   ○ selected  ● active                          │
+ *   │  [Skeuo preview] [Glass preview] [Min preview]  │
  *   │                                                 │
  *   │  Accessibility                                  │
- *   │  [ Motor ] [ Vision ] [ Cognitive ] [OneHanded] │  ← 4 toggle chips
+ *   │  [ Motor ] [ Vision ] [ Cognitive ] [OneHanded] │
+ *   │                                                 │
+ *   │  Wallpaper                                      │
+ *   │  ┌──────────────────────────────────────────┐   │
+ *   │  │  🖼  Wallpaper       Change  ›            │   │
+ *   │  └──────────────────────────────────────────┘   │
+ *   │                                                 │
+ *   │  Icons                                          │
+ *   │  Size   [ S ] [ M ] [ L ]                       │
+ *   │  Shape  [●circle][■sq][⬟squircle][◆teardrop]   │
  *   │                                                 │
  *   │  [  Apply  ]                                    │
  *   └────────────────────────────────────────────────┘
- *
- * Architecture:
- * - Local state for paradigm + profiles while the drawer is open
- * - On "Apply" (or live if autoApply) → dispatch to WeftConfigContext
- * - Three PreviewCards always render their respective paradigm using LOCAL
- *   semantics (they call compose() internally from props)
- * - The active PreviewCard shows the composed result of paradigm × profiles
- * - Animated slide-up entry, spring dismissal
- * - Paradigm switch: selected card scales up, others scale down (spring)
- * - Profile toggles: Toggle atoms, connected to local state
  */
 
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
@@ -49,7 +42,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWeftConfig } from '../hooks/useWeftConfig';
 import { PreviewCard } from '../components/PreviewCard';
-import type { AccessibilityProfile, Paradigm } from '../context/types';
+import type { AccessibilityProfile, IconShape, Paradigm } from '../context/types';
 import { ONBOARDING_KEY } from './OnboardingScreen';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +54,8 @@ export type CustomizationScreenProps = {
   animValue: Animated.Value;
   onDismiss: () => void;
   isOpen: boolean;
+  /** Called when the user taps the Wallpaper entry row. */
+  onOpenWallpaperPicker?: () => void;
   style?: ViewStyle;
 };
 
@@ -80,6 +75,109 @@ const PROFILES: { id: AccessibilityProfile; label: string; description: string }
   { id: 'cognitive', label: 'Cognitive',  description: 'Less noise'       },
   { id: 'oneHanded', label: 'One-Handed', description: 'Thumb zone'       },
 ];
+
+const ICON_SIZES: { id: number; label: string }[] = [
+  { id: 48, label: 'S' },
+  { id: 60, label: 'M' },
+  { id: 72, label: 'L' },
+];
+
+const ICON_SHAPES: { id: IconShape; label: string; symbol: string }[] = [
+  { id: 'circle',         label: 'Circle',    symbol: '●' },
+  { id: 'squircle',       label: 'Squircle',  symbol: '⬟' },
+  { id: 'rounded-square', label: 'Square',    symbol: '■' },
+  { id: 'teardrop',       label: 'Teardrop',  symbol: '◆' },
+];
+
+// ---------------------------------------------------------------------------
+// WallpaperRow — tappable entry row that opens the wallpaper picker
+// ---------------------------------------------------------------------------
+
+const WallpaperRow = memo(function WallpaperRow({
+  onPress,
+  rowBg,
+  rowBorder,
+  textPrimary,
+  textSecondary,
+  accentColor,
+}: {
+  onPress: () => void;
+  rowBg: string;
+  rowBorder: string;
+  textPrimary: string;
+  textSecondary: string;
+  accentColor: string;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Change wallpaper"
+      style={[styles.wallpaperRow, { backgroundColor: rowBg, borderColor: rowBorder }]}
+    >
+      <Text style={styles.wallpaperIcon}>🖼</Text>
+      <View style={styles.wallpaperRowText}>
+        <Text style={[styles.wallpaperRowTitle, { color: textPrimary }]}>Wallpaper</Text>
+        <Text style={[styles.wallpaperRowSub, { color: textSecondary }]}>
+          Gallery, bundled or Unsplash
+        </Text>
+      </View>
+      <Text style={[styles.wallpaperChevron, { color: accentColor }]}>›</Text>
+    </TouchableOpacity>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// IconOptionChip — single selectable chip for size or shape
+// ---------------------------------------------------------------------------
+
+const IconOptionChip = memo(function IconOptionChip({
+  label,
+  isActive,
+  onPress,
+  accentPrimary,
+  accentSubtle,
+  surfaceBg,
+  borderColor,
+  textPrimary,
+}: {
+  label: string;
+  isActive: boolean;
+  onPress: () => void;
+  accentPrimary: string;
+  accentSubtle: string;
+  surfaceBg: string;
+  borderColor: string;
+  textPrimary: string;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessible
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+      style={[
+        styles.iconChip,
+        {
+          backgroundColor: isActive ? accentSubtle : surfaceBg,
+          borderColor: isActive ? accentPrimary : borderColor,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.iconChipText,
+          { color: isActive ? accentPrimary : textPrimary, fontWeight: isActive ? '700' : '400' },
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+});
 
 // ---------------------------------------------------------------------------
 // ParadigmCard — one of the three selectable paradigm previews
@@ -259,27 +357,31 @@ export const CustomizationScreen = memo(function CustomizationScreen({
   animValue,
   onDismiss,
   isOpen,
+  onOpenWallpaperPicker,
   style,
 }: CustomizationScreenProps) {
-  const { semantics, paradigm, activeProfiles, setParadigm, toggleProfile } =
+  const { semantics, paradigm, activeProfiles, icons, setParadigm, toggleProfile, setIcons } =
     useWeftConfig();
   const insets = useSafeAreaInsets();
   const s = semantics;
 
   // ── Local pending state — editing happens locally; applies on confirm ──────
-  // This means the user can explore without committing until they tap Apply.
   const [localParadigm, setLocalParadigm] = useState<Paradigm>(paradigm);
   const [localProfiles, setLocalProfiles] = useState<AccessibilityProfile[]>(activeProfiles);
+  const [localIconSize, setLocalIconSize] = useState<number>(icons.size);
+  const [localIconShape, setLocalIconShape] = useState<IconShape>(icons.shape);
 
   // Sync local state when the drawer opens
   useEffect(() => {
     if (isOpen) {
       setLocalParadigm(paradigm);
       setLocalProfiles(activeProfiles);
+      setLocalIconSize(icons.size);
+      setLocalIconShape(icons.shape);
     }
-  }, [isOpen, paradigm, activeProfiles]);
+  }, [isOpen, paradigm, activeProfiles, icons.size, icons.shape]);
 
-  // ── Back handler — dismiss on back press when open ────────────────────────
+  // ── Back handler ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -302,20 +404,23 @@ export const CustomizationScreen = memo(function CustomizationScreen({
 
   const handleApply = useCallback(() => {
     setParadigm(localParadigm);
-    // Sync profiles: add new ones, remove unchecked ones
+    // Sync profiles
     const current = new Set(activeProfiles);
     const next    = new Set(localProfiles);
-
-    // Toggle off removed profiles
     for (const p of current) {
       if (!next.has(p)) toggleProfile(p);
     }
-    // Toggle on added profiles
     for (const p of next) {
       if (!current.has(p)) toggleProfile(p);
     }
+    // Apply icon changes
+    setIcons({ size: localIconSize, shape: localIconShape });
     onDismiss();
-  }, [localParadigm, localProfiles, activeProfiles, setParadigm, toggleProfile, onDismiss]);
+  }, [
+    localParadigm, localProfiles, activeProfiles,
+    localIconSize, localIconShape,
+    setParadigm, toggleProfile, setIcons, onDismiss,
+  ]);
 
   const handleCancel = useCallback(() => {
     onDismiss();
@@ -334,11 +439,8 @@ export const CustomizationScreen = memo(function CustomizationScreen({
     extrapolate: 'clamp',
   });
 
-  // ── Surface colors — use customization surface tokens ─────────────────────
+  // ── Surface colors ────────────────────────────────────────────────────────
   const cs  = s.surface.customization;
-
-  // For the panel, always use a near-opaque solid regardless of paradigm.
-  // The customization surface needs to be readable at all times.
   const panelBg = cs.background;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -380,7 +482,6 @@ export const CustomizationScreen = memo(function CustomizationScreen({
           <Text style={[styles.headerTitle, { color: cs.textPrimary }]}>
             Customise
           </Text>
-          {/* Spacer to balance the close button */}
           <View style={styles.closeBtn} />
         </View>
 
@@ -438,6 +539,82 @@ export const CustomizationScreen = memo(function CustomizationScreen({
             ))}
           </View>
 
+          {/* ── Wallpaper section ─────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: cs.textSecondary, marginTop: 28 }]}>
+            Wallpaper
+          </Text>
+
+          <WallpaperRow
+            onPress={() => onOpenWallpaperPicker?.()}
+            rowBg={cs.backgroundAlt}
+            rowBorder={cs.border}
+            textPrimary={cs.textPrimary}
+            textSecondary={cs.textSecondary}
+            accentColor={s.accent.primary}
+          />
+
+          {/* ── Icons section ─────────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: cs.textSecondary, marginTop: 28 }]}>
+            Icons
+          </Text>
+
+          {/* Size row */}
+          <View style={styles.iconOptionRow}>
+            <Text style={[styles.iconOptionLabel, { color: cs.textSecondary }]}>Size</Text>
+            <View style={styles.iconChipGroup}>
+              {ICON_SIZES.map(opt => (
+                <IconOptionChip
+                  key={opt.id}
+                  label={opt.label}
+                  isActive={localIconSize === opt.id}
+                  onPress={() => setLocalIconSize(opt.id)}
+                  accentPrimary={s.accent.primary}
+                  accentSubtle={s.accent.subtle}
+                  surfaceBg={cs.backgroundAlt}
+                  borderColor={cs.border}
+                  textPrimary={cs.textPrimary}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Shape row */}
+          <View style={[styles.iconOptionRow, { marginTop: 10 }]}>
+            <Text style={[styles.iconOptionLabel, { color: cs.textSecondary }]}>Shape</Text>
+            <View style={styles.iconChipGroup}>
+              {ICON_SHAPES.map(opt => (
+                <IconOptionChip
+                  key={opt.id}
+                  label={opt.symbol}
+                  isActive={localIconShape === opt.id}
+                  onPress={() => setLocalIconShape(opt.id)}
+                  accentPrimary={s.accent.primary}
+                  accentSubtle={s.accent.subtle}
+                  surfaceBg={cs.backgroundAlt}
+                  borderColor={cs.border}
+                  textPrimary={cs.textPrimary}
+                />
+              ))}
+            </View>
+          </View>
+          {/* Shape label row so the user knows which option is which */}
+          <View style={styles.iconShapeLabelRow}>
+            {ICON_SHAPES.map(opt => (
+              <Text
+                key={opt.id}
+                style={[
+                  styles.iconShapeCaption,
+                  {
+                    color: localIconShape === opt.id ? s.accent.primary : cs.textSecondary,
+                    fontWeight: localIconShape === opt.id ? '600' : '400',
+                  },
+                ]}
+              >
+                {opt.label}
+              </Text>
+            ))}
+          </View>
+
           {/* ── Apply button ─────────────────────────────────────────── */}
           <TouchableOpacity
             onPress={handleApply}
@@ -458,7 +635,6 @@ export const CustomizationScreen = memo(function CustomizationScreen({
               onPress={async () => {
                 await AsyncStorage.removeItem(ONBOARDING_KEY);
                 await AsyncStorage.removeItem('weft:config');
-                // Force a reload so onboarding appears again
                 // eslint-disable-next-line @typescript-eslint/no-var-requires
                 require('react-native').DevSettings.reload();
               }}
@@ -618,5 +794,80 @@ const styles = StyleSheet.create({
   devResetText: {
     fontSize: 11,
     letterSpacing: 0.3,
+  },
+
+  // ── Wallpaper row ──
+  wallpaperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+  },
+  wallpaperIcon: {
+    fontSize: 22,
+  },
+  wallpaperRowText: {
+    flex: 1,
+  },
+  wallpaperRowTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+  },
+  wallpaperRowSub: {
+    fontSize: 11,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  wallpaperChevron: {
+    fontSize: 22,
+    fontWeight: '300',
+    lineHeight: 24,
+  },
+
+  // ── Icon options ──
+  iconOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 4,
+  },
+  iconOptionLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    width: 42,
+  },
+  iconChipGroup: {
+    flexDirection: 'row',
+    gap: 8,
+    flex: 1,
+  },
+  iconChip: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  iconChipText: {
+    fontSize: 14,
+  },
+  iconShapeLabelRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+    marginHorizontal: 4,
+    paddingLeft: 54, // aligns under chips (42 label width + 12 gap)
+    gap: 8,
+  },
+  iconShapeCaption: {
+    flex: 1,
+    fontSize: 9,
+    textAlign: 'center',
+    letterSpacing: 0.1,
   },
 });
