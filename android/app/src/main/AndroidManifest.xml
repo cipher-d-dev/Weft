@@ -1,15 +1,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Required by react-native-launcher-kit on Android 11+ (API 30+) to
          enumerate installed apps. Without this, getApps() returns an empty
          list on API 30+ devices. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <!-- Required to read the system wallpaper drawable via WallpaperManager -->
+
+    <!-- Read the system wallpaper so it shows behind the launcher UI.
+         Android 13+ (API 33+) uses READ_WALLPAPER_INTERNAL instead of
+         READ_EXTERNAL_STORAGE for this purpose. Both are declared so the
+         correct one is used on each API level. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <!-- Required to set navigation bar color and control system UI -->
-    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION" />
+    <uses-permission android:name="android.permission.READ_WALLPAPER_INTERNAL"
+        android:minSdkVersion="33" />
+
+    <!-- Allows setting wallpapers — some devices also require this to READ
+         the wallpaper via WallpaperManager.getDrawable(). -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+
+    <!-- Lets Weft receive a broadcast when the device finishes booting,
+         so it can restore any background state after a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Haptic feedback on icon long-press (optional but improves feel). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
       android:name=".MainApplication"

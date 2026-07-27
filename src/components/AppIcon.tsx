@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableWithoutFeedback, View, ViewStyle } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableWithoutFeedback, Vibration, View, ViewStyle } from 'react-native';
 import { useWeftConfig } from '../hooks/useWeftConfig';
 
 // ---------------------------------------------------------------------------
@@ -43,10 +43,16 @@ const AppIcon = React.memo<AppIconProps>(({ icon, label, onPress, onLongPress, s
     }).start();
   }, [scaleAnim]);
 
+  const handleLongPress = useCallback(() => {
+    // Short haptic pulse — standard launcher long-press feedback
+    Vibration.vibrate(50);
+    onLongPress?.();
+  }, [onLongPress]);
+
   return (
     <TouchableWithoutFeedback
       onPress={onPress}
-      onLongPress={onLongPress}
+      onLongPress={handleLongPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       accessible

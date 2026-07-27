@@ -520,7 +520,9 @@ const styles = StyleSheet.create({
     backgroundColor: BG_COLOR,
     zIndex: 999,
     flexDirection: 'column',
-    justifyContent: 'space-between',
+    // Don't use space-between — it leaves a gap when insets are small.
+    // Instead use flex layout with flex:1 on the cards section.
+    justifyContent: 'flex-start',
   } as ViewStyle,
 
   // ── Background shimmer ────────────────────────────────────────────────────
@@ -579,11 +581,11 @@ const styles = StyleSheet.create({
   // ── Middle ────────────────────────────────────────────────────────────────
 
   cardsSection: {
+    flex: 1,                    // fills all remaining space between logo and CTA
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 12,
-    // Give each card room to scale without clipping neighbours
     paddingVertical: 16,
   },
 

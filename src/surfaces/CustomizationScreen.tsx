@@ -46,9 +46,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWeftConfig } from '../hooks/useWeftConfig';
 import { PreviewCard } from '../components/PreviewCard';
 import type { AccessibilityProfile, Paradigm } from '../context/types';
+import { ONBOARDING_KEY } from './OnboardingScreen';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -449,6 +451,25 @@ export const CustomizationScreen = memo(function CustomizationScreen({
               Apply
             </Text>
           </TouchableOpacity>
+
+          {/* ── Dev-only: reset onboarding ────────────────────────────── */}
+          {__DEV__ && (
+            <TouchableOpacity
+              onPress={async () => {
+                await AsyncStorage.removeItem(ONBOARDING_KEY);
+                await AsyncStorage.removeItem('weft:config');
+                // Force a reload so onboarding appears again
+                // eslint-disable-next-line @typescript-eslint/no-var-requires
+                require('react-native').DevSettings.reload();
+              }}
+              style={[styles.devResetBtn, { borderColor: s.surface.customization.border }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.devResetText, { color: s.surface.customization.textSecondary }]}>
+                ⚙ Dev: Reset onboarding
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </Animated.View>
     </View>
@@ -584,6 +605,18 @@ const styles = StyleSheet.create({
   applyBtnText: {
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  devResetBtn: {
+    marginTop: 12,
+    marginHorizontal: 4,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  devResetText: {
+    fontSize: 11,
     letterSpacing: 0.3,
   },
 });

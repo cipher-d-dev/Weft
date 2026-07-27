@@ -26,8 +26,10 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   BackHandler,
+  Dimensions,
+  Easing,
   FlatList,
   Image,
   PanResponder,
@@ -99,7 +101,7 @@ const AppGridItem = React.memo(function AppGridItem({
   );
 });
 
-/** Dock slot — resolves app from the full installed list by package name. */
+/** Dock slot — resolves pinned apps, falls back to first 4 if none found. */
 function DockApps({
   allApps,
 }: {
@@ -107,9 +109,16 @@ function DockApps({
 }) {
   const dockApps = useMemo(() => {
     const byPackage = new Map(allApps.map(a => [a.packageName, a]));
-    return DOCK_PACKAGES.map(pkg => byPackage.get(pkg)).filter(
-      (a): a is AppDetail => a !== undefined,
-    );
+    const pinned = DOCK_PACKAGES
+      .map(pkg => byPackage.get(pkg))
+      .filter((a): a is AppDetail => a !== undefined);
+
+    // If none of the pinned packages are installed (common on emulators
+    // which use different package names), fall back to the first 4 apps.
+    if (pinned.length === 0 && allApps.length > 0) {
+      return allApps.slice(0, 4);
+    }
+    return pinned;
   }, [allApps]);
 
   return (
@@ -240,6 +249,134 @@ function PageDots({
 }
 
 // ---------------------------------------------------------------------------
+// SkeletonGrid — placeholder shown while apps load
+// ---------------------------------------------------------------------------
+// SkeletonGrid — left-to-right shimmer placeholder while apps load
+// ---------------------------------------------------------------------------
+
+/**
+ * Each skeleton cell has a base muted color. A bright shimmer stripe
+ * (a narrow white View) translates from -cellWidth to +cellWidth repeatedly,
+ * creating the classic left-to-right shimmer effect.
+ * All cells share the same translateX anim so they shimmer in sync.
+ */
+function SkeletonCell({
+  width,
+  height,
+  borderRadius,
+  baseColor,
+  shimmerX,
+}: {
+  width: number;
+  height: number;
+  borderRadius: number;
+  baseColor: string;
+  shimmerX: Animated.Value;
+}) {
+  return (
+    <View
+      style={{
+        width,
+        height,
+        borderRadius,
+        backgroundColor: baseColor,
+        overflow: 'hidden',
+      }}
+    >
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          width: width * 0.5,
+          backgroundColor: 'rgba(255,255,255,0.18)',
+          transform: [{ translateX: shimmerX }],
+        }}
+      />
+    </View>
+  );
+}
+
+function SkeletonGrid({
+  columns,
+  screenWidth,
+  paddingH,
+  gap,
+  iconSize,
+  accentColor,
+  topInset,
+  dockClearance,
+}: {
+  columns: number;
+  screenWidth: number;
+  paddingH: number;
+  gap: number;
+  iconSize: number;
+  accentColor: string;
+  topInset: number;
+  dockClearance: number;
+}) {
+  const shimmerX = useRef(new Animated.Value(-iconSize)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmerX, {
+        toValue: iconSize * 1.5,
+        duration: 1200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+    return () => shimmerX.stopAnimation();
+  }, [shimmerX, iconSize]);
+
+  const cellWidth = (screenWidth - paddingH * 2 - gap * (columns - 1)) / columns;
+  const ROWS = 3;
+  const cells = Array.from({ length: columns * ROWS });
+  // Muted version of accent — skeleton base color
+  const baseColor = `${accentColor}28`; // ~16% opacity
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        paddingTop: topInset + 80,
+        paddingHorizontal: paddingH,
+        paddingBottom: dockClearance,
+      }}
+    >
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
+        {cells.map((_, i) => (
+          <View
+            key={i}
+            style={{
+              width: cellWidth,
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <SkeletonCell
+              width={iconSize}
+              height={iconSize}
+              borderRadius={14}
+              baseColor={baseColor}
+              shimmerX={shimmerX}
+            />
+            <SkeletonCell
+              width={iconSize * 0.6}
+              height={7}
+              borderRadius={4}
+              baseColor={baseColor}
+              shimmerX={shimmerX}
+            />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // HomeScreen
 // ---------------------------------------------------------------------------
 
@@ -305,10 +442,10 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization }: HomeScr
       ? layout.screenPaddingH + oneHandedOffset
       : layout.screenPaddingH;
 
-  // Grid cell width — divide available width equally across columns with gaps.
-  // We use a fixed screen width estimate here; Dimensions.get() would be more
-  // precise but introduces a re-render on orientation change. Fine for Phase 4.
-  const SCREEN_WIDTH = 393; // dp — typical Android density-independent width
+  // Use actual screen width so the grid is always centered on any device.
+  // Dimensions.get('window') returns the correct dp width accounting for
+  // density — no re-render on orientation change since launchers are portrait-locked.
+  const SCREEN_WIDTH = Dimensions.get('window').width;
   const availableWidth = SCREEN_WIDTH - paddingLeft - paddingRight;
   const totalGapWidth = layout.gridGap * (layout.gridColumns - 1);
   const cellWidth = (availableWidth - totalGapWidth) / layout.gridColumns;
@@ -430,14 +567,18 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization }: HomeScr
         barStyle={paradigm === 'skeuo' ? 'dark-content' : 'light-content'}
       />
 
-      {/* ── Loading state ─────────────────────────────────────────────── */}
+      {/* ── Loading state — skeleton grid ─────────────────────────────── */}
       {loading && (
-        <View style={styles.centred}>
-          <ActivityIndicator color={s.accent.primary} size="large" />
-          <Text style={[styles.loadingText, { color: s.surface.home.textSecondary }]}>
-            Loading apps…
-          </Text>
-        </View>
+        <SkeletonGrid
+          columns={layout.gridColumns}
+          screenWidth={SCREEN_WIDTH}
+          paddingH={layout.screenPaddingH}
+          gap={layout.gridGap}
+          iconSize={iconSize}
+          accentColor={s.accent.primary}
+          topInset={insets.top}
+          dockClearance={dockClearance}
+        />
       )}
 
       {/* ── Error state ───────────────────────────────────────────────── */}
@@ -504,12 +645,10 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization }: HomeScr
         />
       )}
 
-      {/* ── Dock ──────────────────────────────────────────────────────── */}
-      {!loading && (
-        <Dock style={{ paddingBottom: insets.bottom }}>
-          <DockApps allApps={apps} />
-        </Dock>
-      )}
+      {/* ── Dock — always rendered, even during app list refresh ─────── */}
+      <Dock style={{ paddingBottom: insets.bottom }}>
+        <DockApps allApps={apps} />
+      </Dock>
     </View>
   );
 }
@@ -547,9 +686,10 @@ const styles = StyleSheet.create({
     // width/height applied inline from semantics.appIcon.containerSize
   },
   dockIconImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
+    // Fill the AppIcon container exactly — no white padding showing.
+    // The AppIcon clipContainer clips it to the border radius.
+    width: '100%',
+    height: '100%',
   },
   // ── Paginated grid ──
   pageFlatList: {
