@@ -47,6 +47,8 @@ import { HomeScreen } from './src/surfaces/HomeScreen';
 import { ControlCenterScreen } from './src/surfaces/ControlCenterScreen';
 import { CustomizationScreen } from './src/surfaces/CustomizationScreen';
 import { OnboardingScreen, ONBOARDING_KEY } from './src/surfaces/OnboardingScreen';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { useAppState } from './src/hooks/useAppState';
 
 const { SetDefaultLauncher } = NativeModules;
 
@@ -67,6 +69,58 @@ const SPRING_CLOSE: Animated.SpringAnimationConfig = {
   friction: 20,
   useNativeDriver: true,
 };
+
+// ---------------------------------------------------------------------------
+// LauncherRoot — inner component so hooks (useAppState) can be called
+// ---------------------------------------------------------------------------
+
+function LauncherRoot({
+  openControlCenter,
+  closeControlCenter,
+  animValue,
+  isOpen,
+  openDrawer,
+  closeDrawer,
+  drawerAnimValue,
+  isDrawerOpen,
+}: {
+  openControlCenter: () => void;
+  closeControlCenter: () => void;
+  animValue: Animated.Value;
+  isOpen: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  drawerAnimValue: Animated.Value;
+  isDrawerOpen: boolean;
+}) {
+  const { justResumed } = useAppState();
+
+  return (
+    <View style={styles.root}>
+      <ErrorBoundary name="Home">
+        <HomeScreen
+          onOpenControlCenter={openControlCenter}
+          onOpenCustomization={openDrawer}
+          resumeKey={justResumed ? Date.now() : 0}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary name="ControlCenter">
+        <ControlCenterScreen
+          animValue={animValue}
+          onDismiss={closeControlCenter}
+          isOpen={isOpen}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary name="Customization">
+        <CustomizationScreen
+          animValue={drawerAnimValue}
+          onDismiss={closeDrawer}
+          isOpen={isDrawerOpen}
+        />
+      </ErrorBoundary>
+    </View>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // App
@@ -205,22 +259,16 @@ export default function App(): React.JSX.Element {
 
         {/* ── Normal launcher ─────────────────────────────────────────── */}
         {hasOnboarded === true && (
-          <View style={styles.root}>
-            <HomeScreen
-              onOpenControlCenter={openControlCenter}
-              onOpenCustomization={openDrawer}
-            />
-            <ControlCenterScreen
-              animValue={animValue}
-              onDismiss={closeControlCenter}
-              isOpen={isOpen}
-            />
-            <CustomizationScreen
-              animValue={drawerAnimValue}
-              onDismiss={closeDrawer}
-              isOpen={isDrawerOpen}
-            />
-          </View>
+          <LauncherRoot
+            openControlCenter={openControlCenter}
+            closeControlCenter={closeControlCenter}
+            animValue={animValue}
+            isOpen={isOpen}
+            openDrawer={openDrawer}
+            closeDrawer={closeDrawer}
+            drawerAnimValue={drawerAnimValue}
+            isDrawerOpen={isDrawerOpen}
+          />
         )}
       </WeftConfigProvider>
     </SafeAreaProvider>

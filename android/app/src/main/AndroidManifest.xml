@@ -27,13 +27,39 @@
     <!-- Haptic feedback on icon long-press (optional but improves feel). -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Brightness control — WRITE_SETTINGS lets us set screen brightness.
+         On Android 6+ the user must also grant "Modify system settings" in
+         Settings → Apps → Special app access. We prompt them if not granted. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+
+    <!-- Bluetooth toggle — BLUETOOTH_CONNECT required on Android 12+ (API 31+)
+         to enable/disable the adapter. On older versions BLUETOOTH_ADMIN suffices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
+        android:minSdkVersion="31" />
+
+    <!-- Do Not Disturb — ACCESS_NOTIFICATION_POLICY lets us read and set the
+         interruption filter. The user must grant "Do Not Disturb access" in
+         Settings → Apps → Special app access. We prompt them if not granted. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!-- Flashlight — CAMERA lets us use CameraManager.setTorchMode().
+         No runtime permission dialog is shown for torch-only use on most devices,
+         but the manifest declaration is required. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- WiFi state read — needed on Android 9 and below for getWifiEnabled(). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
-      android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
       <activity

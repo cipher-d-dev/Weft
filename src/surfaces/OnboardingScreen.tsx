@@ -47,6 +47,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -410,102 +411,112 @@ export const OnboardingScreen = memo(function OnboardingScreen({
         pointerEvents="none"
       />
 
-      {/* ── Top section — logo + tagline ───────────────────────────────── */}
-      <View
-        style={[
-          styles.topSection,
-          { paddingTop: insets.top + 32 },
-        ]}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        {/*
-         * 1. Logo: 'Weft' rendered letter-by-letter in a row.
-         * Each Animated.Text has its own opacity + translateY animation.
-         */}
-        <View style={styles.logoRow} accessible accessibilityLabel="Weft">
-          {LOGO_LETTERS.map((letter, index) => (
-            <Animated.Text
-              key={index}
-              style={[
-                styles.logoText,
-                {
-                  opacity: letterAnims[index].opacity,
-                  transform: [
-                    { translateY: letterAnims[index].translateY },
-                  ],
-                },
-              ]}
-              // Prevent individual letters from being read by screen readers
-              // (the accessible View above provides the full label)
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              {letter}
-            </Animated.Text>
+        {/* ── Top section — logo + tagline ───────────────────────────────── */}
+        <View
+          style={[
+            styles.topSection,
+            { paddingTop: insets.top + 32 },
+          ]}
+        >
+          {/*
+           * 1. Logo: 'Weft' rendered letter-by-letter in a row.
+           * Each Animated.Text has its own opacity + translateY animation.
+           */}
+          <View style={styles.logoRow} accessible accessibilityLabel="Weft">
+            {LOGO_LETTERS.map((letter, index) => (
+              <Animated.Text
+                key={index}
+                style={[
+                  styles.logoText,
+                  {
+                    opacity: letterAnims[index].opacity,
+                    transform: [
+                      { translateY: letterAnims[index].translateY },
+                    ],
+                  },
+                ]}
+                // Prevent individual letters from being read by screen readers
+                // (the accessible View above provides the full label)
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              >
+                {letter}
+              </Animated.Text>
+            ))}
+          </View>
+
+          {/* 2. Tagline fade-up */}
+          <Animated.Text
+            style={[
+              styles.tagline,
+              {
+                opacity: taglineOpacity,
+                transform: [{ translateY: taglineTranslateY }],
+              },
+            ]}
+          >
+            Your launcher, your way
+          </Animated.Text>
+        </View>
+
+        {/* ── Middle section — paradigm preview cards ────────────────────── */}
+        <View style={styles.cardsSection}>
+          {PARADIGMS.map((p, index) => (
+            <ParadigmOption
+              key={p.id}
+              id={p.id}
+              label={p.label}
+              description={p.description}
+              accentColor={p.accentColor}
+              isSelected={selectedParadigm === p.id}
+              onSelect={handleSelectParadigm}
+              entryOpacity={cardAnims[index].opacity}
+              entryTranslateY={cardAnims[index].translateY}
+            />
           ))}
         </View>
 
-        {/* 2. Tagline fade-up */}
-        <Animated.Text
+        {/* ── Bottom section — CTA button ────────────────────────────────── */}
+        <View
           style={[
-            styles.tagline,
+            styles.bottomSection,
             {
-              opacity: taglineOpacity,
-              transform: [{ translateY: taglineTranslateY }],
+              paddingBottom: Math.max(insets.bottom + 24, 32),
+              minHeight: 100,
             },
           ]}
         >
-          Your launcher, your way
-        </Animated.Text>
-      </View>
-
-      {/* ── Middle section — paradigm preview cards ────────────────────── */}
-      <View style={styles.cardsSection}>
-        {PARADIGMS.map((p, index) => (
-          <ParadigmOption
-            key={p.id}
-            id={p.id}
-            label={p.label}
-            description={p.description}
-            accentColor={p.accentColor}
-            isSelected={selectedParadigm === p.id}
-            onSelect={handleSelectParadigm}
-            entryOpacity={cardAnims[index].opacity}
-            entryTranslateY={cardAnims[index].translateY}
-          />
-        ))}
-      </View>
-
-      {/* ── Bottom section — CTA button ────────────────────────────────── */}
-      <View
-        style={[
-          styles.bottomSection,
-          { paddingBottom: insets.bottom + 24 },
-        ]}
-      >
-        {/* 4. CTA fade-in wrapper */}
-        <Animated.View style={{ opacity: ctaOpacity }}>
-          <TouchableOpacity
-            onPress={handleGetStarted}
-            activeOpacity={0.85}
-            style={[
-              styles.ctaButton,
-              { backgroundColor: selectedEntry.accentColor },
-            ]}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="Get started with selected launcher style"
-          >
-            <Text
+          {/* 4. CTA fade-in wrapper */}
+          <Animated.View style={{ opacity: ctaOpacity }}>
+            <TouchableOpacity
+              onPress={handleGetStarted}
+              activeOpacity={0.85}
               style={[
-                styles.ctaButtonText,
-                { color: selectedEntry.onAccentColor },
+                styles.ctaButton,
+                { backgroundColor: selectedEntry.accentColor },
               ]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Get started with selected launcher style"
             >
-              Get Started
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+              <Text
+                style={[
+                  styles.ctaButtonText,
+                  { color: selectedEntry.onAccentColor },
+                ]}
+              >
+                Get Started
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </ScrollView>
     </Animated.View>
   );
 });
@@ -519,29 +530,27 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: BG_COLOR,
     zIndex: 999,
-    flexDirection: 'column',
-    // Don't use space-between — it leaves a gap when insets are small.
-    // Instead use flex layout with flex:1 on the cards section.
-    justifyContent: 'flex-start',
   } as ViewStyle,
+
+  // ── ScrollView ────────────────────────────────────────────────────────────
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    flexDirection: 'column',
+  },
 
   // ── Background shimmer ────────────────────────────────────────────────────
 
-  /**
-   * Simulates a radial gradient using a large circle with full borderRadius.
-   * Positioned absolutely at center-top, partially above the screen edge.
-   * The Animated.loop pulses opacity between 0.04 and 0.10.
-   */
   shimmerCircle: {
     position: 'absolute',
     width: 300,
     height: 300,
     borderRadius: 150,
     backgroundColor: '#4A90D9',
-    // Center horizontally, offset upward so only the bottom arc is visible
     top: -50,
     alignSelf: 'center',
-    // Prevent this decorative element from blocking touch events
   } as ViewStyle,
 
   // ── Top ───────────────────────────────────────────────────────────────────
@@ -549,18 +558,14 @@ const styles = StyleSheet.create({
   topSection: {
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 16,
   },
 
-  /**
-   * Row container for the individual letter Animated.Text components.
-   * flexDirection:'row' + baseline alignment keeps the wordmark cohesive.
-   */
   logoRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
 
-  /** Large display wordmark — each letter rendered as a separate Animated.Text. */
   logoText: {
     fontSize: 72,
     fontWeight: '800',
@@ -581,22 +586,21 @@ const styles = StyleSheet.create({
   // ── Middle ────────────────────────────────────────────────────────────────
 
   cardsSection: {
-    flex: 1,                    // fills all remaining space between logo and CTA
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 16,
+    paddingVertical: 24,
+    // Fixed height so CTA never overlaps regardless of screen size
+    height: 340,
   },
 
   optionWrapper: {
     flex: 1,
     alignItems: 'center',
-    // Allow the spring-scaled card to breathe without clipping
     overflow: 'visible',
   },
 
-  /** Touchable fills the full optionWrapper area. */
   optionTouchable: {
     alignItems: 'center',
     width: '100%',
@@ -606,15 +610,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  /** Selection ring overlay — exact dimensions match PreviewCard (148×268). */
   selectionRing: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    // Match PreviewCard height constant
     height: 268,
-    // Match PreviewCard width constant; center relative to optionInner
     width: 148,
     alignSelf: 'center',
     borderRadius: 18,
@@ -626,7 +627,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     letterSpacing: 0.1,
-    // Prevent long labels from pushing layout
     maxWidth: SCREEN_W / 3 - 16,
   },
 
@@ -641,13 +641,13 @@ const styles = StyleSheet.create({
 
   bottomSection: {
     paddingHorizontal: 24,
+    // minHeight and paddingBottom applied inline
   },
 
   ctaButton: {
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
-    // Subtle shadow so the button lifts off the dark bg
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,

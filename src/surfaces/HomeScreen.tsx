@@ -385,9 +385,16 @@ type HomeScreenProps = {
   onOpenControlCenter?: () => void;
   /** Called when the user taps the customize gear in the dock. */
   onOpenCustomization?: () => void;
+  /**
+   * Passed a new timestamp by App.tsx whenever the app resumes from background.
+   * HomeScreen passes it as the key to WallpaperBackground, forcing a re-read
+   * of the wallpaper via WallpaperModule after the user may have changed it.
+   * Value of 0 means no refresh needed.
+   */
+  resumeKey?: number;
 };
 
-export function HomeScreen({ onOpenControlCenter, onOpenCustomization }: HomeScreenProps): React.JSX.Element {
+export function HomeScreen({ onOpenControlCenter, onOpenCustomization, resumeKey = 0 }: HomeScreenProps): React.JSX.Element {
   const { semantics, paradigm } = useWeftConfig();
   const insets = useSafeAreaInsets();
   const { apps, loading, error } = useInstalledApps();
@@ -559,7 +566,7 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization }: HomeScr
       {...swipeGesture.panHandlers}
     >
       {/* ── Wallpaper layer — sits behind all content ──────────────── */}
-      <WallpaperBackground screenWidth={SCREEN_WIDTH} />
+      <WallpaperBackground key={resumeKey || undefined} screenWidth={SCREEN_WIDTH} />
 
       <StatusBar
         backgroundColor="transparent"

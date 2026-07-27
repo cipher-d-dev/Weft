@@ -21,6 +21,8 @@ class MainApplication : Application(), ReactApplication {
                     add(WeftSystemUIPackage())
                     // SetDefaultLauncherModule — prompts user to set Weft as default home
                     add(SetDefaultLauncherPackage())
+                    // WeftControlModule — brightness, volume, wifi, bt, DND, flashlight, airplane
+                    add(WeftControlPackage())
                 },
         )
     }
