@@ -19,3 +19,4 @@ export { OnboardingScreen } from './OnboardingScreen';
 export type { OnboardingScreenProps } from './OnboardingScreen';
 export { WallpaperPickerSheet } from './WallpaperPickerSheet';
 export type { WallpaperPickerSheetProps } from './WallpaperPickerSheet';
+export { GestureConfigScreen } from './GestureConfigScreen';

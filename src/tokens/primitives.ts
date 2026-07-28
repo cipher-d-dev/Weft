@@ -130,6 +130,51 @@ export const alpha = {
   dark80: 'rgba(0,0,0,0.80)',
 } as const;
 
+/**
+ * Liquid Glass — Apple-style layered frosted glass system.
+ *
+ * Architecture:
+ *   Base layer    → deep BlurView (blurRadius 60)
+ *   Tint layer    → thin semi-transparent white over the blur
+ *   Specular edge → 1px inner border with bright white highlight on top,
+ *                   subtle shadow on bottom — simulates refracted light bending
+ *                   around the glass edge
+ *   Refraction    → slightly lighter tint on one axis to fake depth parallax
+ *
+ * Use liquidGlass.tint as backgroundColor on BlurView containers.
+ * Use liquidGlass.specularEdge as borderColor for the inner-glow border.
+ * Use liquidGlass.specularTop / specularBottom split via a LinearGradient
+ * border overlay for the most premium look.
+ */
+export const liquidGlass = {
+  /** Base tint over deep blur — cool white with subtle blue cast */
+  tint: 'rgba(235,242,252,0.22)',
+  /** Deeper tint for dock and prominent surfaces */
+  tintDeep: 'rgba(220,233,250,0.38)',
+  /** Maximum tint — used for Vision accessibility cascade */
+  tintMax: 'rgba(210,226,248,0.92)',
+  /** Specular highlight edge (top/left — light hits here) */
+  specularBright: 'rgba(255,255,255,0.70)',
+  /** Specular shadow edge (bottom/right — light exits here) */
+  specularDim: 'rgba(255,255,255,0.18)',
+  /** Unified border for tiles and cards — subtle white ring */
+  border: 'rgba(255,255,255,0.28)',
+  /** Stronger border for dock pill */
+  borderStrong: 'rgba(255,255,255,0.45)',
+  /** Inner glow — simulates light trapped inside the glass */
+  innerGlow: 'rgba(255,255,255,0.12)',
+  /** Refraction tint — slightly warm offset to fake depth */
+  refraction: 'rgba(180,210,255,0.10)',
+  /** Scrim behind modal glass surfaces */
+  scrim: 'rgba(8,16,32,0.72)',
+  /** Dock background — deep dark base so white icons pop */
+  dockBase: 'rgba(12,20,40,0.55)',
+  /** Blur radius for standard glass surfaces */
+  blurRadius: 60,
+  /** Blur radius for dock (slightly lighter) */
+  blurRadiusDock: 48,
+} as const;
+
 // ---------------------------------------------------------------------------
 // Spacing — 4px base grid
 // ---------------------------------------------------------------------------
@@ -232,6 +277,56 @@ export const elevation = {
 } as const satisfies Record<string, ShadowToken>;
 
 export type ElevationKey = keyof typeof elevation;
+
+/**
+ * Warm elevation shadows — used exclusively by the Skeuo paradigm.
+ * shadowColor is a rich amber-brown derived from the parchment palette so
+ * shadows feel like natural light on paper rather than a generic black drop.
+ */
+export const warmElevation = {
+  none: {
+    elevation: 0,
+    shadowColor: '#3D2B1A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+  },
+  xs: {
+    elevation: 2,
+    shadowColor: '#3D2B1A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.10,
+    shadowRadius: 3,
+  },
+  sm: {
+    elevation: 4,
+    shadowColor: '#3D2B1A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+  },
+  md: {
+    elevation: 8,
+    shadowColor: '#3D2B1A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+  },
+  lg: {
+    elevation: 0,    // Android elevation removed — use shadowColor drop only
+    shadowColor: '#3D2B1A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 24,
+  },
+  dock: {
+    elevation: 0,    // No Android elevation — colored shadow via shadowColor
+    shadowColor: '#5C3D1E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 20,
+  },
+} as const satisfies Record<string, ShadowToken>;
 
 // ---------------------------------------------------------------------------
 // Opacity

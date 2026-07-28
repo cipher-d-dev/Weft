@@ -467,7 +467,9 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
 
   const translateY = animValue.interpolate({
     inputRange:  [0, 1],
-    outputRange: [SCREEN_HEIGHT * 0.06, 0],
+    // When closed (0) the sheet must translate DOWN by its full height so it
+    // sits completely off screen — not just 6%, which left 88% covering Home.
+    outputRange: [SHEET_HEIGHT, 0],
     extrapolate: 'clamp',
   });
 

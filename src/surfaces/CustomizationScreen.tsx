@@ -56,6 +56,8 @@ export type CustomizationScreenProps = {
   isOpen: boolean;
   /** Called when the user taps the Wallpaper entry row. */
   onOpenWallpaperPicker?: () => void;
+  /** Called when the user taps the Gestures entry row. */
+  onOpenGestureConfig?: () => void;
   style?: ViewStyle;
 };
 
@@ -122,6 +124,46 @@ const WallpaperRow = memo(function WallpaperRow({
         <Text style={[styles.wallpaperRowTitle, { color: textPrimary }]}>Wallpaper</Text>
         <Text style={[styles.wallpaperRowSub, { color: textSecondary }]}>
           Gallery, bundled or Unsplash
+        </Text>
+      </View>
+      <Text style={[styles.wallpaperChevron, { color: accentColor }]}>›</Text>
+    </TouchableOpacity>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// GestureRow — tappable entry row that opens the gesture config screen
+// ---------------------------------------------------------------------------
+
+const GestureRow = memo(function GestureRow({
+  onPress,
+  rowBg,
+  rowBorder,
+  textPrimary,
+  textSecondary,
+  accentColor,
+}: {
+  onPress: () => void;
+  rowBg: string;
+  rowBorder: string;
+  textPrimary: string;
+  textSecondary: string;
+  accentColor: string;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Configure gesture bindings"
+      style={[styles.wallpaperRow, { backgroundColor: rowBg, borderColor: rowBorder }]}
+    >
+      <Text style={styles.wallpaperIcon}>👆</Text>
+      <View style={styles.wallpaperRowText}>
+        <Text style={[styles.wallpaperRowTitle, { color: textPrimary }]}>Gestures</Text>
+        <Text style={[styles.wallpaperRowSub, { color: textSecondary }]}>
+          Swipe actions for 4 directions
         </Text>
       </View>
       <Text style={[styles.wallpaperChevron, { color: accentColor }]}>›</Text>
@@ -358,6 +400,7 @@ export const CustomizationScreen = memo(function CustomizationScreen({
   onDismiss,
   isOpen,
   onOpenWallpaperPicker,
+  onOpenGestureConfig,
   style,
 }: CustomizationScreenProps) {
   const { semantics, paradigm, activeProfiles, icons, setParadigm, toggleProfile, setIcons } =
@@ -546,6 +589,20 @@ export const CustomizationScreen = memo(function CustomizationScreen({
 
           <WallpaperRow
             onPress={() => onOpenWallpaperPicker?.()}
+            rowBg={cs.backgroundAlt}
+            rowBorder={cs.border}
+            textPrimary={cs.textPrimary}
+            textSecondary={cs.textSecondary}
+            accentColor={s.accent.primary}
+          />
+
+          {/* ── Gestures section ──────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: cs.textSecondary, marginTop: 28 }]}>
+            Gestures
+          </Text>
+
+          <GestureRow
+            onPress={() => onOpenGestureConfig?.()}
             rowBg={cs.backgroundAlt}
             rowBorder={cs.border}
             textPrimary={cs.textPrimary}

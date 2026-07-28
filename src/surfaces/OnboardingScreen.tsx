@@ -238,27 +238,28 @@ export const OnboardingScreen = memo(function OnboardingScreen({
   // ── Animation values ───────────────────────────────────────────────────
 
   // 1. Logo letter-by-letter: one opacity + translateY pair per letter
+  // Start fully visible so content shows even if animation hasn't played yet
   const letterAnims = useRef(
     LOGO_LETTERS.map(() => ({
-      opacity: new Animated.Value(0),
-      translateY: new Animated.Value(12),
+      opacity: new Animated.Value(1),
+      translateY: new Animated.Value(0),
     }))
   ).current;
 
   // 2. Tagline fade-up
-  const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const taglineTranslateY = useRef(new Animated.Value(8)).current;
+  const taglineOpacity = useRef(new Animated.Value(1)).current;
+  const taglineTranslateY = useRef(new Animated.Value(0)).current;
 
-  // 3. Cards stagger-in — start at translateY +40 (off-screen downward)
+  // 3. Cards stagger-in — start visible
   const cardAnims = useRef(
     PARADIGMS.map(() => ({
-      opacity: new Animated.Value(0),
-      translateY: new Animated.Value(40),
+      opacity: new Animated.Value(1),
+      translateY: new Animated.Value(0),
     }))
   ).current;
 
   // 4. CTA button fade-in
-  const ctaOpacity = useRef(new Animated.Value(0)).current;
+  const ctaOpacity = useRef(new Animated.Value(1)).current;
 
   // 5. Background shimmer — pulses between 0.04 and 0.10
   const shimmerOpacity = useRef(new Animated.Value(0.04)).current;
@@ -527,7 +528,7 @@ export const OnboardingScreen = memo(function OnboardingScreen({
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: BG_COLOR,
     zIndex: 999,
   } as ViewStyle,

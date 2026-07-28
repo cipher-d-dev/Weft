@@ -73,11 +73,14 @@ type ParadigmStyle = {
 
 const PARADIGM_STYLES: Record<'glass' | 'skeuo' | 'minimal', ParadigmStyle> = {
   glass: {
-    tint: 'rgba(6, 14, 23, 0.35)',
+    // Deep blue-black base so the wallpaper photo reads as a dark cinematic
+    // backdrop. The liquid glass UI layers float on top. More opacity than
+    // before so low-contrast wallpapers still give crisp white text.
+    tint: 'rgba(4, 10, 22, 0.52)',
     base: '#060E17',
     highlight: '#1A3A5C',
     highlightOpacity: 0.7,
-    lightNavIcons: false,     // light icons on dark nav
+    lightNavIcons: false,
     lightStatusIcons: false,
   },
   skeuo: {
@@ -85,7 +88,7 @@ const PARADIGM_STYLES: Record<'glass' | 'skeuo' | 'minimal', ParadigmStyle> = {
     base: '#D9CFC2',
     highlight: '#F5F0E8',
     highlightOpacity: 0.55,
-    lightNavIcons: true,      // dark icons on light nav
+    lightNavIcons: true,
     lightStatusIcons: true,
   },
   minimal: {

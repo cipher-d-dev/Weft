@@ -17,6 +17,8 @@ import {
   accentBlue,
   accentSage,
   alpha,
+  liquidGlass,
+  warmElevation,
   spacing,
   radii,
   elevation,
@@ -51,7 +53,7 @@ export function semanticsSkeuo(): AppSemantics {
   const homeSurface = surface({
     background: neutral[50],
     backgroundAlt: neutral[100],
-    scrim: alpha.dark40,
+    scrim: 'rgba(45,30,15,0.45)',
     border: neutral[200],
     textPrimary: neutral[800],
     textSecondary: neutral[500],
@@ -64,7 +66,7 @@ export function semanticsSkeuo(): AppSemantics {
       controlCenter: surface({
         background: neutral[100],
         backgroundAlt: neutral[150],
-        scrim: alpha.dark60,
+        scrim: 'rgba(45,30,15,0.55)',
         border: neutral[200],
         textPrimary: neutral[800],
         textSecondary: neutral[500],
@@ -73,7 +75,7 @@ export function semanticsSkeuo(): AppSemantics {
       customization: surface({
         background: neutral[50],
         backgroundAlt: neutral[100],
-        scrim: alpha.dark40,
+        scrim: 'rgba(45,30,15,0.45)',
         border: neutral[200],
         textPrimary: neutral[800],
         textSecondary: neutral[500],
@@ -117,7 +119,7 @@ export function semanticsSkeuo(): AppSemantics {
         radius: radii.lg,
         touchTarget: 64,
         padding: spacing[4],
-        shadow: elevation.sm,
+        shadow: warmElevation.sm,         // warm-toned shadow, not black
         labelType: typography.labelSm,
         chipType: typography.captionMd,
       },
@@ -140,40 +142,35 @@ export function semanticsSkeuo(): AppSemantics {
       },
       sectionHeader: {
         textColor: neutral[500],
-        plateBackground: 'transparent',  // no plate in skeuo — clean label only
+        plateBackground: 'transparent',
         plateRadius: radii.none,
         platePaddingV: 0,
         platePaddingH: 0,
         labelType: typography.labelSm,
       },
       widgetCard: {
+        // Subtle warm gradient via background — off-white with a cream undertone
         background: neutral[0],
         border: neutral[150],
         radius: radii.lg,
         padding: spacing[4],
-        shadow: elevation.md,
+        shadow: warmElevation.md,         // warm-toned card shadow
       },
       dock: {
-        background: `rgba(237, 232, 223, ${opacity[90]})`,
+        background: `rgba(237, 232, 223, ${opacity[92]})`, // warm parchment
         border: neutral[200],
         radius: radii['2xl'],
         height: 80,
         paddingH: spacing[6],
-        shadow: elevation.lg,
+        shadow: warmElevation.dock,       // warm colored drop, no Android elevation
       },
       appIcon: {
         containerSize: 60,
         radius: radii.lg,
-        shadow: {
-          elevation: 2,
-          shadowColor: '#5C4A32',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.12,
-          shadowRadius: 2,
-        },
+        shadow: warmElevation.xs,         // warm amber-brown physical shadow
         labelColor: neutral[800],
         labelType: typography.captionMd,
-        labelTextShadow: null,  // light bg — no text shadow needed
+        labelTextShadow: null,
       },
       glassContainer: null,
       contextMenu: {
@@ -186,7 +183,7 @@ export function semanticsSkeuo(): AppSemantics {
         labelType: typography.labelMd,
         dividerColor: neutral[150],
         destructiveColor: '#E53935',
-        shadow: elevation.lg,
+        shadow: warmElevation.md,
       },
       notificationBadge: {
         background: '#E53935',
@@ -250,15 +247,15 @@ export function semanticsSkeuo(): AppSemantics {
 }
 
 // ---------------------------------------------------------------------------
-// semanticsGlass — frosted cool blues, blur tint, 22px radii
+// semanticsGlass — liquid glass, deep blur, specular inner glow
 // ---------------------------------------------------------------------------
 
 export function semanticsGlass(): AppSemantics {
   const homeSurface = surface({
     background: 'transparent',        // wallpaper shows through
-    backgroundAlt: alpha.glass40,
-    scrim: alpha.dark60,
-    border: alpha.glass60,
+    backgroundAlt: liquidGlass.tint,
+    scrim: liquidGlass.scrim,
+    border: liquidGlass.border,
     textPrimary: neutral[0],
     textSecondary: `rgba(255,255,255,${opacity[70]})`,
     textDisabled: `rgba(255,255,255,${opacity[30]})`,
@@ -269,75 +266,75 @@ export function semanticsGlass(): AppSemantics {
       home: homeSurface,
       controlCenter: surface({
         background: 'transparent',
-        backgroundAlt: alpha.glass40,
-        scrim: alpha.dark80,
-        border: alpha.glass60,
+        backgroundAlt: liquidGlass.tint,
+        scrim: liquidGlass.scrim,
+        border: liquidGlass.border,
         textPrimary: neutral[0],
         textSecondary: `rgba(255,255,255,${opacity[70]})`,
         textDisabled: `rgba(255,255,255,${opacity[30]})`,
       }),
       customization: surface({
         background: glass[900],
-        backgroundAlt: glass[800],
-        scrim: alpha.dark60,
-        border: alpha.glass40,
+        backgroundAlt: liquidGlass.tint,
+        scrim: liquidGlass.scrim,
+        border: liquidGlass.border,
         textPrimary: neutral[0],
         textSecondary: `rgba(255,255,255,${opacity[70]})`,
         textDisabled: `rgba(255,255,255,${opacity[30]})`,
       }),
       allApps: {
         background: glass[900],
-        searchBarBackground: alpha.glass40,
-        searchBarBorder: alpha.glass60,
+        searchBarBackground: liquidGlass.tint,
+        searchBarBorder: liquidGlass.border,
         searchBarText: neutral[0],
         searchBarPlaceholder: `rgba(255,255,255,${opacity[40]})`,
-        handleColor: alpha.glass60,
+        handleColor: liquidGlass.border,
         indexBarText: `rgba(255,255,255,${opacity[50]})`,
         indexBarActiveText: accentBlue[300],
         sectionHeaderText: `rgba(255,255,255,${opacity[60]})`,
       },
       wallpaperPicker: {
         background: glass[900],
-        cardBackground: alpha.glass40,
+        cardBackground: liquidGlass.tint,
         cardRadius: radii.xl,
-        selectedBorder: accentBlue[400],
+        selectedBorder: liquidGlass.specularBright,
         selectedBorderWidth: 2.5,
-        categoryChipBackground: alpha.glass40,
+        categoryChipBackground: liquidGlass.tint,
         categoryChipText: neutral[0],
-        searchBarBackground: alpha.glass40,
+        searchBarBackground: liquidGlass.tint,
         searchBarText: neutral[0],
       },
     },
 
     component: {
       tile: {
-        background: alpha.glass40,
+        background: liquidGlass.tint,
         backgroundSelected: `rgba(33,150,243,${opacity[30]})`,
-        backgroundPressed: alpha.glass60,
+        backgroundPressed: liquidGlass.tintDeep,
         backgroundDisabled: `rgba(255,255,255,${opacity[10]})`,
         iconColor: neutral[0],
         labelColor: neutral[0],
         chipBackground: `rgba(33,150,243,${opacity[40]})`,
         chipForeground: neutral[0],
-        border: alpha.glass60,
-        radius: radii.xl,         // 22px — glass-specific
+        border: liquidGlass.border,       // subtle inner ring
+        radius: radii.xl,
         touchTarget: 64,
         padding: spacing[4],
-        shadow: elevation.none,   // Glass: no elevation — depth comes from tint+blur
+        shadow: elevation.none,           // No shadow — depth via glass tint + border
         labelType: typography.labelSm,
         chipType: typography.captionMd,
       },
       slider: {
-        trackBackground: alpha.glass40,
+        trackBackground: liquidGlass.tint,
         trackFill: accentBlue[500],
         thumbFill: neutral[0],
-        thumbBorder: accentBlue[300],
+        thumbBorder: liquidGlass.specularBright,
         trackHeight: 6,
         thumbSize: 22,
         trackRadius: radii.full,
       },
       toggle: {
-        trackOff: alpha.glass40,
+        trackOff: liquidGlass.tint,
         trackOn: accentBlue[500],
         thumb: neutral[0],
         width: 50,
@@ -346,59 +343,59 @@ export function semanticsGlass(): AppSemantics {
       },
       sectionHeader: {
         textColor: neutral[0],
-        plateBackground: alpha.glass40,
+        plateBackground: liquidGlass.innerGlow,  // subtle inner glow plate
         plateRadius: radii.sm,
         platePaddingV: spacing[1],
         platePaddingH: spacing[3],
         labelType: typography.labelSm,
       },
       widgetCard: {
-        background: alpha.glass40,
-        border: alpha.glass60,
+        background: liquidGlass.tint,
+        border: liquidGlass.border,
         radius: radii.xl,
         padding: spacing[4],
-        shadow: elevation.md,
+        shadow: elevation.none,
       },
       dock: {
-        background: `rgba(10, 25, 47, 0.82)`,   // deep navy, not white glass — labels are white so dock must be dark
-        border: alpha.glass60,
+        background: liquidGlass.dockBase,   // Deep dark base so white icons pop
+        border: liquidGlass.borderStrong,   // Stronger border for prominence
         radius: radii['2xl'],
         height: 80,
         paddingH: spacing[6],
-        shadow: elevation.lg,
+        shadow: elevation.none,             // Glass never uses elevation shadows
       },
       appIcon: {
         containerSize: 60,
         radius: radii.lg,
         shadow: {
-          elevation: 6,
+          elevation: 0,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.45,
-          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.55,
+          shadowRadius: 12,
         },
         labelColor: neutral[0],
         labelType: typography.captionMd,
         labelTextShadow: {
-          color: 'rgba(0,0,0,0.6)',
+          color: 'rgba(0,0,0,0.65)',
           offset: { width: 0, height: 1 },
-          radius: 4,
+          radius: 5,
         },
       },
       glassContainer: {
-        tint: alpha.glass60,     // 60% white tint — deepens to 92% under Vision
-        blurRadius: 40,
+        tint: liquidGlass.tint,               // Base liquid glass tint
+        blurRadius: liquidGlass.blurRadius,   // 60pt deep blur
         radius: radii['2xl'],
       },
       contextMenu: {
-        background: glass[800],
-        border: alpha.glass60,
+        background: liquidGlass.tintDeep,
+        border: liquidGlass.border,
         radius: radii.xl,
         itemHeight: 52,
         itemPaddingH: spacing[4],
         labelColor: neutral[0],
         labelType: typography.labelMd,
-        dividerColor: alpha.glass40,
+        dividerColor: liquidGlass.innerGlow,
         destructiveColor: '#EF5350',
         shadow: elevation.lg,
       },
@@ -415,20 +412,20 @@ export function semanticsGlass(): AppSemantics {
     state: {
       tile: {
         enabled: {
-          background: alpha.glass40,
-          border: alpha.glass60,
+          background: liquidGlass.tint,
+          border: liquidGlass.border,
           iconColor: neutral[0],
           labelColor: neutral[0],
         },
         selected: {
           background: `rgba(33,150,243,${opacity[30]})`,
-          border: accentBlue[300],
+          border: liquidGlass.specularBright,
           iconColor: neutral[0],
           labelColor: neutral[0],
         },
         pressed: {
-          background: alpha.glass60,
-          border: alpha.glass60,
+          background: liquidGlass.tintDeep,
+          border: liquidGlass.border,
           iconColor: `rgba(255,255,255,${opacity[80]})`,
           labelColor: `rgba(255,255,255,${opacity[80]})`,
         },
@@ -439,8 +436,8 @@ export function semanticsGlass(): AppSemantics {
           labelColor: `rgba(255,255,255,${opacity[30]})`,
         },
         focused: {
-          background: alpha.glass40,
-          border: accentBlue[300],
+          background: liquidGlass.tint,
+          border: liquidGlass.specularBright,
           iconColor: neutral[0],
           labelColor: neutral[0],
         },
@@ -533,11 +530,11 @@ export function semanticsMinimal(): AppSemantics {
         labelColor: neutral[50],
         chipBackground: accentSage[700],
         chipForeground: neutral[50],
-        border: neutral[700],
-        radius: radii.md,          // tighter radius — minimal aesthetic
+        border: neutral[700],       // hairline inner border for definition
+        radius: radii.md,
         touchTarget: 64,
         padding: spacing[4],
-        shadow: elevation.none,    // flat — no shadows in minimal
+        shadow: elevation.none,
         labelType: typography.labelSm,
         chipType: typography.captionMd,
       },
@@ -546,7 +543,7 @@ export function semanticsMinimal(): AppSemantics {
         trackFill: accentSage[500],
         thumbFill: neutral[50],
         thumbBorder: neutral[700],
-        trackHeight: 4,            // thinner — minimal
+        trackHeight: 4,
         thumbSize: 20,
         trackRadius: radii.full,
       },
@@ -560,7 +557,7 @@ export function semanticsMinimal(): AppSemantics {
       },
       sectionHeader: {
         textColor: neutral[400],
-        plateBackground: 'transparent',  // no plate in minimal
+        plateBackground: 'transparent',
         plateRadius: radii.none,
         platePaddingV: 0,
         platePaddingH: 0,
@@ -568,21 +565,21 @@ export function semanticsMinimal(): AppSemantics {
       },
       widgetCard: {
         background: neutral[900],
-        border: neutral[700],
+        border: neutral[700],         // hairline border
         radius: radii.md,
         padding: spacing[4],
         shadow: elevation.none,
       },
       dock: {
         background: neutral[900],
-        border: neutral[700],
+        border: neutral[700],           // hairline border
         radius: radii.lg,
         height: 72,
         paddingH: spacing[6],
         shadow: elevation.none,
       },
       appIcon: {
-        containerSize: 56,           // slightly smaller — tighter grid
+        containerSize: 60,              // unified to 60dp like other paradigms
         radius: radii.md,
         shadow: elevation.none,
         labelColor: neutral[300],

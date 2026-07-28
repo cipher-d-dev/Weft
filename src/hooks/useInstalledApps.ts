@@ -35,6 +35,14 @@ import type { AppDetail } from 'react-native-launcher-kit/lib/typescript/interfa
 /** How long the cached list is considered fresh (5 minutes). */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Maximum time (ms) we allow a fetch to be "in flight" before declaring it
+ * dead and allowing a new one to start. Protects against the hot-reload
+ * resurrection bug where fetchInFlight stays true across a Fast Refresh
+ * cycle and leaves all waiters hanging forever.
+ */
+const FETCH_TIMEOUT_MS = 15_000;
+
 type AppCache = {
   apps: AppDetail[];
   fetchedAt: number; // Date.now() timestamp
@@ -47,11 +55,45 @@ let moduleCache: AppCache | null = null;
 let fetchInFlight = false;
 
 /**
+ * Timestamp (Date.now()) when the most recent in-flight fetch started.
+ * Used to detect stale fetchInFlight=true states after a hot-reload where
+ * the previous fetch promise was abandoned but the flag was never reset.
+ */
+let fetchStartedAt = 0;
+
+/**
  * Callbacks registered by each mounted hook instance.
  * When the in-flight fetch resolves, all waiters are notified.
  */
 type FetchWaiter = (apps: AppDetail[], err: Error | null) => void;
 const fetchWaiters: FetchWaiter[] = [];
+
+// ---------------------------------------------------------------------------
+// Stuck-state recovery
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if fetchInFlight is set but the fetch has been running longer
+ * than FETCH_TIMEOUT_MS — meaning it was abandoned (e.g. by a hot reload).
+ * In that case we reset the flag so a fresh fetch can be started.
+ */
+function isFetchStuck(): boolean {
+  if (!fetchInFlight) return false;
+  return Date.now() - fetchStartedAt > FETCH_TIMEOUT_MS;
+}
+
+/**
+ * Resets the in-flight state and drains any waiting callbacks with an empty
+ * result so they don't wait forever. Called when a stuck fetch is detected.
+ */
+function recoverStuckFetch(): void {
+  fetchInFlight = false;
+  fetchStartedAt = 0;
+  const waiting = fetchWaiters.splice(0);
+  for (const waiter of waiting) {
+    waiter([], new Error('Fetch timed out — retrying'));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Cache helpers
@@ -112,6 +154,7 @@ export function useInstalledApps(): InstalledAppsState {
    */
   const doFetch = useCallback(async () => {
     fetchInFlight = true;
+    fetchStartedAt = Date.now();
     let result: AppDetail[] = [];
     let fetchError: Error | null = null;
 
@@ -165,6 +208,14 @@ export function useInstalledApps(): InstalledAppsState {
   // ── Mount effect ──────────────────────────────────────────────────────────
 
   useEffect(() => {
+    // ── Stuck-state recovery ─────────────────────────────────────────────
+    // If fetchInFlight has been set for longer than FETCH_TIMEOUT_MS the
+    // previous fetch was abandoned (most likely by a hot-reload). Clear it
+    // and drain the stale waiters so we can start fresh.
+    if (isFetchStuck()) {
+      recoverStuckFetch();
+    }
+
     // Case 1: cache is fresh — use it immediately, no fetch needed.
     if (isCacheFresh()) {
       // State was already initialised with cache in useState above.
