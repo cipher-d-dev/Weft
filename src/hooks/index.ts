@@ -9,3 +9,5 @@ export { useNotificationBadges } from './useNotificationBadges';
 export type { BadgeMap, UseNotificationBadgesResult } from './useNotificationBadges';
 export { useGestureHandler } from './useGestureHandler';
 export type { GestureCallbacks } from './useGestureHandler';
+export { useAdaptiveText } from './useAdaptiveText';
+export type { AdaptiveTextTokens } from './useAdaptiveText';

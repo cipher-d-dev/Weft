@@ -3,14 +3,13 @@
  *
  * Long-press context menu that appears over an app icon. Renders as a full-
  * screen absolute overlay with a semi-transparent scrim and a spring-animated
- * card. All visual tokens come from semantics.component.contextMenu — zero
- * inline colour overrides.
+ * card. All visual tokens come from semantics.component.contextMenu.
  *
- * Positioning logic: the card places itself above the anchor if the icon is
- * in the lower half of the screen, below it otherwise.
+ * Design: icon-first rows, no emojis, clean geometric vector icons rendered
+ * entirely from View/StyleSheet primitives — no native icon library required.
  *
- * Cognitive profile: "Add to Dock" and "Remove from Home" are hidden to reduce
- * visual noise. itemHeight is already raised by the Motor profile via tokens.
+ * Positioning: card sits above the anchor when in the lower half of the screen,
+ * below it otherwise.
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -62,8 +61,97 @@ const SPRING_CONFIG = {
   useNativeDriver: true,
 } as const;
 
-// Estimated card width — used to keep the card within screen bounds.
-const CARD_WIDTH = 240;
+const CARD_WIDTH = 248;
+
+// ---------------------------------------------------------------------------
+// Inline vector icons — pure View/StyleSheet, zero native dependencies
+// ---------------------------------------------------------------------------
+
+/** Play / launch arrow */
+function IconPlay({ color, size }: { color: string; size: number }) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 0, height: 0,
+        borderTopWidth: size * 0.38, borderBottomWidth: size * 0.38,
+        borderLeftWidth: size * 0.65, borderTopColor: 'transparent',
+        borderBottomColor: 'transparent', borderLeftColor: color,
+        marginLeft: size * 0.08,
+      }} />
+    </View>
+  );
+}
+
+/** Info circle — ring + dot + stem */
+function IconInfo({ color, size }: { color: string; size: number }) {
+  const r = size / 2;
+  const border = size * 0.1;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{
+        width: size, height: size, borderRadius: r,
+        borderWidth: border, borderColor: color,
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <View style={{ width: border * 1.6, height: border * 1.6, borderRadius: border,
+          backgroundColor: color, marginBottom: size * 0.04 }} />
+        <View style={{ width: border * 1.4, height: size * 0.28, borderRadius: border / 2,
+          backgroundColor: color, marginTop: size * 0.01 }} />
+      </View>
+    </View>
+  );
+}
+
+/** Pin icon — circle with stem */
+function IconPin({ color, size }: { color: string; size: number }) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.55, height: size * 0.55, borderRadius: size * 0.28,
+        backgroundColor: color, marginBottom: size * 0.04 }} />
+      <View style={{ width: size * 0.1, height: size * 0.3, borderRadius: size * 0.05,
+        backgroundColor: color }} />
+    </View>
+  );
+}
+
+/** Minus-in-circle (remove) */
+function IconRemove({ color, size }: { color: string; size: number }) {
+  const r = size / 2;
+  const border = size * 0.1;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size, height: size, borderRadius: r,
+        borderWidth: border, borderColor: color,
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <View style={{ width: size * 0.5, height: border * 1.4, borderRadius: border,
+          backgroundColor: color }} />
+      </View>
+    </View>
+  );
+}
+
+/** Trash bin */
+function IconTrash({ color, size }: { color: string; size: number }) {
+  const sw = size * 0.08;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Lid */}
+      <View style={{ width: size * 0.7, height: sw * 1.4, backgroundColor: color,
+        borderRadius: sw, marginBottom: sw }} />
+      {/* Body */}
+      <View style={{ width: size * 0.56, height: size * 0.52, borderWidth: sw,
+        borderColor: color, borderRadius: sw,
+        alignItems: 'center', justifyContent: 'space-around', flexDirection: 'row',
+        paddingHorizontal: sw,
+      }}>
+        <View style={{ width: sw, height: '70%', borderRadius: sw / 2,
+          backgroundColor: color }} />
+        <View style={{ width: sw, height: '70%', borderRadius: sw / 2,
+          backgroundColor: color }} />
+      </View>
+    </View>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -87,142 +175,69 @@ const AppContextMenu = React.memo<AppContextMenuProps>(
 
     const isCognitive = activeProfiles.includes('cognitive' as AccessibilityProfile);
 
-    // Animated values — created once via useRef, never recreated.
-    const scaleAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim   = useRef(new Animated.Value(0)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
 
-    // -------------------------------------------------------------------------
-    // Open / close animation
-    // -------------------------------------------------------------------------
-
+    // ── Animation ────────────────────────────────────────────────────────────
     useEffect(() => {
       if (visible) {
-        // Fade scrim in and spring the card open simultaneously.
         Animated.parallel([
-          Animated.timing(opacityAnim, {
-            toValue: 1,
-            duration: 180,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scaleAnim, {
-            toValue: 1,
-            ...SPRING_CONFIG,
-          }),
+          Animated.timing(opacityAnim, { toValue: 1, duration: 160, useNativeDriver: true }),
+          Animated.spring(scaleAnim, { toValue: 1, ...SPRING_CONFIG }),
         ]).start();
       } else {
-        // Reverse: spring card back to 0 and fade scrim out.
         Animated.parallel([
-          Animated.timing(opacityAnim, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scaleAnim, {
-            toValue: 0,
-            ...SPRING_CONFIG,
-          }),
+          Animated.timing(opacityAnim, { toValue: 0, duration: 130, useNativeDriver: true }),
+          Animated.spring(scaleAnim, { toValue: 0, ...SPRING_CONFIG }),
         ]).start();
       }
     }, [visible, scaleAnim, opacityAnim]);
 
-    // -------------------------------------------------------------------------
-    // Card positioning
-    // -------------------------------------------------------------------------
-
+    // ── Positioning ───────────────────────────────────────────────────────────
     const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-
     let cardStyle: ViewStyle = {};
 
     if (anchorPosition !== null) {
       const anchorCenterX = anchorPosition.x + anchorPosition.width / 2;
       const anchorCenterY = anchorPosition.y + anchorPosition.height / 2;
       const isBottomHalf = anchorCenterY > screenHeight / 2;
-
-      // Horizontal: centre over the icon, clamped to screen edges.
       const rawLeft = anchorCenterX - CARD_WIDTH / 2;
       const clampedLeft = Math.max(8, Math.min(rawLeft, screenWidth - CARD_WIDTH - 8));
 
       if (isBottomHalf) {
-        // Place card above the icon.
-        cardStyle = {
-          position: 'absolute',
-          bottom: screenHeight - anchorPosition.y + 8,
-          left: clampedLeft,
-          width: CARD_WIDTH,
-        };
+        cardStyle = { position: 'absolute', bottom: screenHeight - anchorPosition.y + 8,
+          left: clampedLeft, width: CARD_WIDTH };
       } else {
-        // Place card below the icon.
-        cardStyle = {
-          position: 'absolute',
+        cardStyle = { position: 'absolute',
           top: anchorPosition.y + anchorPosition.height + 8,
-          left: clampedLeft,
-          width: CARD_WIDTH,
-        };
+          left: clampedLeft, width: CARD_WIDTH };
       }
     } else {
-      // Fallback: centre of screen
-      cardStyle = {
-        position: 'absolute',
-        top: screenHeight / 2 - 160,
-        left: screenWidth / 2 - CARD_WIDTH / 2,
-        width: CARD_WIDTH,
-      };
+      cardStyle = { position: 'absolute', top: screenHeight / 2 - 180,
+        left: screenWidth / 2 - CARD_WIDTH / 2, width: CARD_WIDTH };
     }
 
-    // -------------------------------------------------------------------------
-    // Item press handlers — stable references via useCallback
-    // -------------------------------------------------------------------------
-
-    const handleOpen = useCallback(() => {
-      onDismiss();
-      onOpen();
-    }, [onDismiss, onOpen]);
-
-    const handleAppInfo = useCallback(() => {
-      onDismiss();
-      onAppInfo();
-    }, [onDismiss, onAppInfo]);
-
-    const handleAddToDock = useCallback(() => {
-      onDismiss();
-      onAddToDock();
-    }, [onDismiss, onAddToDock]);
-
-    const handleRemoveFromHome = useCallback(() => {
-      onDismiss();
-      onRemoveFromHome();
-    }, [onDismiss, onRemoveFromHome]);
-
-    const handleUninstall = useCallback(() => {
+    // ── Handlers ──────────────────────────────────────────────────────────────
+    const handleOpen        = useCallback(() => { onDismiss(); onOpen(); },          [onDismiss, onOpen]);
+    const handleAppInfo     = useCallback(() => { onDismiss(); onAppInfo(); },        [onDismiss, onAppInfo]);
+    const handleAddToDock   = useCallback(() => { onDismiss(); onAddToDock(); },      [onDismiss, onAddToDock]);
+    const handleRemove      = useCallback(() => { onDismiss(); onRemoveFromHome(); }, [onDismiss, onRemoveFromHome]);
+    const handleUninstall   = useCallback(() => {
       if (isSystemApp) return;
-      onDismiss();
-      onUninstall();
+      onDismiss(); onUninstall();
     }, [isSystemApp, onDismiss, onUninstall]);
 
-    // -------------------------------------------------------------------------
-    // Shadow spread for the card
-    // -------------------------------------------------------------------------
-
-    const shadow = cm.shadow;
-
-    // -------------------------------------------------------------------------
-    // Render
-    // -------------------------------------------------------------------------
+    const iconSize = Math.round(cm.itemHeight * 0.36);
+    const shadow   = cm.shadow;
 
     return (
-      <View
-        style={[styles.root, { zIndex: 500 }]}
-        // When not visible, pass touches through so the home screen is usable.
-        pointerEvents={visible ? 'auto' : 'none'}
-      >
-        {/* Scrim — tappable to dismiss */}
+      <View style={[styles.root, { zIndex: 500, pointerEvents: visible ? 'auto' : 'none' }]}>
+        {/* Scrim */}
         <TouchableWithoutFeedback onPress={onDismiss} accessible={false}>
-          <Animated.View
-            style={[styles.scrim, { opacity: opacityAnim }]}
-          />
+          <Animated.View style={[styles.scrim, { opacity: opacityAnim }]} />
         </TouchableWithoutFeedback>
 
-        {/* Menu card */}
+        {/* Card */}
         <Animated.View
           style={[
             cardStyle,
@@ -232,112 +247,74 @@ const AppContextMenu = React.memo<AppContextMenuProps>(
               borderRadius: cm.radius,
               borderWidth: 1,
               borderColor: cm.border,
-              // Shadow
               elevation: shadow.elevation,
               shadowColor: shadow.shadowColor,
               shadowOffset: shadow.shadowOffset,
               shadowOpacity: shadow.shadowOpacity,
               shadowRadius: shadow.shadowRadius,
-              // Spring origin: card scales from its centre point
               transform: [{ scale: scaleAnim }],
             },
           ]}
           accessible={false}
         >
-          {/* App label header — non-tappable */}
-          <View
-            style={[
-              styles.headerRow,
-              {
-                height: cm.itemHeight,
-                paddingHorizontal: cm.itemPaddingH,
-              },
-            ]}
-            accessible
-            accessibilityRole="header"
-            accessibilityLabel={appLabel}
-          >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.headerLabel,
-                {
-                  color: cm.labelColor,
-                  fontFamily: cm.labelType.fontFamily,
-                  fontSize: cm.labelType.fontSize,
-                  fontWeight: '600',
-                  letterSpacing: cm.labelType.letterSpacing,
-                  lineHeight: cm.labelType.lineHeight,
-                  opacity: 0.6,
-                },
-              ]}
-            >
+          {/* App name header */}
+          <View style={[styles.headerRow, { height: cm.itemHeight, paddingHorizontal: cm.itemPaddingH }]}
+            accessible accessibilityRole="header" accessibilityLabel={appLabel}>
+            <Text numberOfLines={1} style={[styles.headerLabel, {
+              color: cm.labelColor, fontFamily: cm.labelType.fontFamily,
+              fontSize: cm.labelType.fontSize, fontWeight: '600',
+              letterSpacing: cm.labelType.letterSpacing, opacity: 0.55,
+            }]}>
               {appLabel}
             </Text>
           </View>
 
-          {/* Divider under header */}
           <View style={[styles.divider, { backgroundColor: cm.dividerColor }]} />
 
           {/* Open */}
           <MenuItem
-            emoji="▶️"
+            icon={<IconPlay color={cm.labelColor} size={iconSize} />}
             label="Open"
-            height={cm.itemHeight}
-            paddingH={cm.itemPaddingH}
-            labelColor={cm.labelColor}
-            labelType={cm.labelType}
+            cm={cm}
             onPress={handleOpen}
           />
 
           {/* App Info */}
           <MenuItem
-            emoji="ℹ️"
+            icon={<IconInfo color={cm.labelColor} size={iconSize} />}
             label="App Info"
-            height={cm.itemHeight}
-            paddingH={cm.itemPaddingH}
-            labelColor={cm.labelColor}
-            labelType={cm.labelType}
+            cm={cm}
             onPress={handleAppInfo}
           />
 
-          {/* Add to Dock — hidden in Cognitive profile */}
+          {/* Add to Home — hidden in Cognitive */}
           {!isCognitive && (
             <MenuItem
-              emoji="📌"
-              label="Add to Dock"
-              height={cm.itemHeight}
-              paddingH={cm.itemPaddingH}
-              labelColor={cm.labelColor}
-              labelType={cm.labelType}
+              icon={<IconPin color={cm.labelColor} size={iconSize} />}
+              label="Add to Home"
+              cm={cm}
               onPress={handleAddToDock}
             />
           )}
 
-          {/* Remove from Home — hidden in Cognitive profile */}
+          {/* Remove from Home — hidden in Cognitive */}
           {!isCognitive && (
             <MenuItem
-              emoji="🗑️"
+              icon={<IconRemove color={cm.labelColor} size={iconSize} />}
               label="Remove from Home"
-              height={cm.itemHeight}
-              paddingH={cm.itemPaddingH}
-              labelColor={cm.labelColor}
-              labelType={cm.labelType}
-              onPress={handleRemoveFromHome}
+              cm={cm}
+              onPress={handleRemove}
             />
           )}
 
-          {/* Divider before destructive action */}
           <View style={[styles.divider, { backgroundColor: cm.dividerColor }]} />
 
-          {/* Uninstall — disabled and muted for system apps */}
+          {/* Uninstall — destructive */}
           <MenuItem
-            emoji="❌"
+            icon={<IconTrash color={isSystemApp ? cm.labelColor : cm.destructiveColor} size={iconSize} />}
             label="Uninstall"
-            height={cm.itemHeight}
-            paddingH={cm.itemPaddingH}
+            cm={cm}
             labelColor={isSystemApp ? cm.labelColor : cm.destructiveColor}
-            labelType={cm.labelType}
             onPress={handleUninstall}
             disabled={isSystemApp}
           />
@@ -350,100 +327,77 @@ const AppContextMenu = React.memo<AppContextMenuProps>(
 AppContextMenu.displayName = 'AppContextMenu';
 
 // ---------------------------------------------------------------------------
-// MenuItem — internal atom
+// MenuItem atom
 // ---------------------------------------------------------------------------
 
 type MenuItemProps = {
-  emoji: string;
+  icon: React.ReactNode;
   label: string;
-  height: number;
-  paddingH: number;
-  labelColor: string;
-  labelType: { fontFamily: string; fontSize: number; fontWeight: string; letterSpacing: number; lineHeight: number };
+  cm: ReturnType<typeof useWeftConfig>['semantics']['component']['contextMenu'];
+  labelColor?: string;
   onPress: () => void;
   disabled?: boolean;
 };
 
 const MenuItem = React.memo<MenuItemProps>(
-  ({ emoji, label, height, paddingH, labelColor, labelType, onPress, disabled = false }) => {
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        disabled={disabled}
-        accessible
-        accessibilityRole="menuitem"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled }}
-        activeOpacity={0.7}
-        style={[
-          styles.menuItem,
-          {
-            height,
-            paddingHorizontal: paddingH,
-            opacity: disabled ? 0.35 : 1,
-          },
-        ]}
+  ({ icon, label, cm, labelColor, onPress, disabled = false }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      accessible
+      accessibilityRole="menuitem"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      activeOpacity={0.65}
+      style={[
+        styles.menuItem,
+        { height: cm.itemHeight, paddingHorizontal: cm.itemPaddingH, opacity: disabled ? 0.3 : 1 },
+      ]}
+    >
+      <View style={styles.menuItemIcon}>{icon}</View>
+      <Text
+        numberOfLines={1}
+        style={{
+          color: labelColor ?? cm.labelColor,
+          fontFamily: cm.labelType.fontFamily,
+          fontSize: cm.labelType.fontSize,
+          fontWeight: cm.labelType.fontWeight as '400' | '500' | '600',
+          letterSpacing: cm.labelType.letterSpacing,
+          lineHeight: cm.labelType.lineHeight,
+          flexShrink: 1,
+        }}
       >
-        <Text style={styles.emoji} accessible={false}>
-          {emoji}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            color: labelColor,
-            fontFamily: labelType.fontFamily,
-            fontSize: labelType.fontSize,
-            fontWeight: labelType.fontWeight as '400' | '500' | '600' | '700',
-            letterSpacing: labelType.letterSpacing,
-            lineHeight: labelType.lineHeight,
-            flexShrink: 1,
-          }}
-        >
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  },
+        {label}
+      </Text>
+    </TouchableOpacity>
+  ),
 );
 
 MenuItem.displayName = 'MenuItem';
 
 // ---------------------------------------------------------------------------
-// Structural / layout styles — no colours, radii, or visual tokens
+// Styles
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFill,
-  },
+  root: { ...StyleSheet.absoluteFill },
   scrim: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.42)',
   },
-  card: {
-    // Visual props applied inline from tokens.
-    // overflow hidden ensures items are clipped to the card's border radius.
-    overflow: 'hidden',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerLabel: {
-    flex: 1,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    width: '100%',
-  },
+  card: { overflow: 'hidden' },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  headerLabel: { flex: 1 },
+  divider: { height: StyleSheet.hairlineWidth, width: '100%' },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
-  emoji: {
-    fontSize: 18,
-    lineHeight: 22,
+  menuItemIcon: {
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

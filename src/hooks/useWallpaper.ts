@@ -21,6 +21,7 @@ import { NativeModules } from 'react-native';
 
 const { WallpaperSet } = NativeModules as {
   WallpaperSet?: {
+    pickFromGallery(): Promise<string>;
     setWallpaperFromBase64(data: string, target: string): Promise<{ success?: boolean; target?: string }>;
     setWallpaperFromUri(uri: string, target: string): Promise<{ success?: boolean; target?: string }>;
     extractDominantColor(data: string): Promise<{
@@ -48,6 +49,22 @@ export type DominantColors = {
 };
 
 export const WallpaperAPI = {
+  /**
+   * Open the native Android image picker and return the selected URI.
+   * Rejects with code 'CANCELLED' if the user dismisses.
+   */
+  async pickFromGallery(): Promise<string | null> {
+    if (!WallpaperSet) return null;
+    try {
+      return await WallpaperSet.pickFromGallery();
+    } catch (e: unknown) {
+      // User cancelled — not an error
+      const code = (e as any)?.code;
+      if (code === 'CANCELLED') return null;
+      throw e;
+    }
+  },
+
   async setFromUri(
     uri: string,
     target: WallpaperTarget = 'both',

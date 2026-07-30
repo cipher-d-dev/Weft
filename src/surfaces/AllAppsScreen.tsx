@@ -27,7 +27,6 @@ import React, {
 import {
   Animated,
   BackHandler,
-  Dimensions,
   FlatList,
   Image,
   Linking,
@@ -36,6 +35,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -194,6 +194,7 @@ type AppRowProps = {
   iconSize: number;
   gridGap: number;
   screenPaddingH: number;
+  screenWidth: number;
   cognitiveMode: boolean;
   onPress: (app: AppDetail) => void;
   onLongPressPosition: (app: AppDetail, pos: { x: number; y: number; width: number; height: number }) => void;
@@ -205,13 +206,14 @@ const AppRow = React.memo<AppRowProps>(({
   iconSize,
   gridGap,
   screenPaddingH,
+  screenWidth,
   cognitiveMode,
   onPress,
   onLongPressPosition,
 }) => {
   const cellWidth = cognitiveMode
     ? undefined
-    : (Dimensions.get('window').width - screenPaddingH * 2 - gridGap * (columns - 1)) / columns;
+    : (screenWidth - screenPaddingH * 2 - gridGap * (columns - 1)) / columns;
 
   return (
     <View style={[styles.rowContainer, { gap: gridGap, paddingHorizontal: screenPaddingH }]}>
@@ -297,13 +299,25 @@ RecentRow.displayName = 'RecentRow';
 
 
 // ---------------------------------------------------------------------------
+// SearchIcon — magnifier lens (pure View, no emoji)
+// ---------------------------------------------------------------------------
+function SearchIcon({ color, size }: { color: string; size: number }) {
+  const r = size * 0.38;
+  const sw = size * 0.12;
+  return (
+    <View style={{ width: size, height: size, marginRight: 8, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: r * 2, height: r * 2, borderRadius: r,
+        borderWidth: sw, borderColor: color }} />
+      <View style={{ position: 'absolute', bottom: 0, right: size * 0.05,
+        width: sw * 1.2, height: size * 0.3, borderRadius: sw,
+        backgroundColor: color, transform: [{ rotate: '45deg' }] }} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // AllAppsScreen — main component
 // ---------------------------------------------------------------------------
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-/** The sheet occupies 94% of screen height. */
-const SHEET_HEIGHT = SCREEN_HEIGHT * 0.94;
 
 const AllAppsScreen = React.memo<AllAppsScreenProps>(({
   animValue,
@@ -314,6 +328,10 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
 }) => {
   const { semantics, activeProfiles } = useWeftConfig();
   const insets = useSafeAreaInsets();
+
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions();
+  /** The sheet occupies 94% of screen height. */
+  const SHEET_HEIGHT = SCREEN_HEIGHT * 0.94;
 
   const s  = semantics.surface.allApps;
   const ai = semantics.component.appIcon;
@@ -504,12 +522,13 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
         iconSize={ai.containerSize}
         gridGap={layout.gridGap}
         screenPaddingH={layout.screenPaddingH}
+        screenWidth={SCREEN_WIDTH}
         cognitiveMode={isCognitive}
         onPress={launchApp}
         onLongPressPosition={handleLongPressPosition}
       />
     );
-  }, [columns, ai.containerSize, layout.gridGap, layout.screenPaddingH, isCognitive, launchApp, handleLongPressPosition]);
+  }, [columns, ai.containerSize, layout.gridGap, layout.screenPaddingH, SCREEN_WIDTH, isCognitive, launchApp, handleLongPressPosition]);
 
   const keyExtractor = useCallback((item: ListItem) => item.key, []);
 
@@ -538,9 +557,15 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
         />
       )}
 
-      {/* ── Handle bar ─────────────────────────────────────────────────── */}
+      {/* ── Handle + header ────────────────────────────────────────────── */}
       <View style={[styles.handleArea, { height: HANDLE_AREA_HEIGHT }]}>
         <View style={[styles.handle, { backgroundColor: s.handleColor }]} />
+      </View>
+      <View style={[styles.sheetHeader, { paddingHorizontal: layout.screenPaddingH }]}>
+        <Text style={[styles.sheetTitle, { color: s.searchBarText }]}>All Apps</Text>
+        <Text style={[styles.appCount, { color: s.searchBarPlaceholder }]}>
+          {apps.length} apps
+        </Text>
       </View>
 
       {/* ── Search bar ─────────────────────────────────────────────────── */}
@@ -563,7 +588,7 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
             },
           ]}
         >
-          <Text style={[styles.searchIcon, { color: s.searchBarPlaceholder }]}>🔍</Text>
+          <SearchIcon color={s.searchBarPlaceholder} size={16} />
           <TextInput
             ref={searchRef}
             value={query}
@@ -589,7 +614,10 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
               accessibilityRole="button"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={[styles.clearIcon, { color: s.searchBarPlaceholder }]}>✕</Text>
+              <View style={styles.clearIconView}>
+                <View style={[styles.clearBar, { backgroundColor: s.searchBarPlaceholder, transform: [{ rotate: '45deg' }] }]} />
+                <View style={[styles.clearBar, { backgroundColor: s.searchBarPlaceholder, transform: [{ rotate: '-45deg' }], position: 'absolute' }]} />
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -679,7 +707,8 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
             dismissMenu();
           }}
           onRemoveFromHome={() => {
-            // No-op: drawer shows all apps, not home grid items.
+            // App drawer shows all apps — "Remove from Home" is not applicable here.
+            // The pin state is managed from the home grid's own context menu.
             dismissMenu();
           }}
         />
@@ -731,10 +760,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 40,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
   },
   searchInput: {
     flex: 1,
@@ -799,6 +824,33 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: INDEX_LETTER_HEIGHT,
     textAlign: 'center',
+  },
+
+  // ── Sheet header ─────────────────────────────────────────────────────────
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+  },
+  sheetTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  appCount: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // ── Clear icon (X) ───────────────────────────────────────────────────────
+  clearIconView: {
+    width: 16, height: 16,
+    marginLeft: 8, paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  clearBar: {
+    width: 12, height: 2, borderRadius: 1,
   },
 });
 

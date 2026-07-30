@@ -47,6 +47,8 @@ export type WeftConfigContextValue = {
   widgets: WidgetConfig[];
   /** Gesture bindings for 4 swipe directions. */
   gestures: GestureBindings;
+  /** Ordered package names pinned to the home grid. */
+  pinnedApps: string[];
   /**
    * True once the persisted config has been read from AsyncStorage (or the
    * read has failed gracefully).  Use this to gate rendering in App.tsx so
@@ -71,6 +73,8 @@ export type WeftConfigContextValue = {
   reorderWidgets: (newOrder: string[]) => void;
   /** Update a gesture binding. */
   setGestureBinding: (direction: keyof GestureBindings, action: GestureAction) => void;
+  /** Replace the list of package names pinned to the home grid. */
+  setPinnedApps: (packages: string[]) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -178,10 +182,20 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
   // Derived values
   // -------------------------------------------------------------------------
 
-  const semantics = useMemo(
-    () => compose(config.paradigm, config.activeProfiles),
-    [config.paradigm, config.activeProfiles],
-  );
+  const semantics = useMemo(() => {
+    const base = compose(config.paradigm, config.activeProfiles);
+    // Apply user icon size over the paradigm default
+    return {
+      ...base,
+      component: {
+        ...base.component,
+        appIcon: {
+          ...base.component.appIcon,
+          containerSize: config.icons.size,
+        },
+      },
+    } as typeof base;
+  }, [config.paradigm, config.activeProfiles, config.icons.size]);
 
   // -------------------------------------------------------------------------
   // Setters
@@ -280,6 +294,10 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
     []
   );
 
+  const setPinnedApps = useCallback((packages: string[]) => {
+    setConfig(prev => ({ ...prev, pinnedApps: packages }));
+  }, []);
+
   // -------------------------------------------------------------------------
   // Context value (memoised to avoid unnecessary re-renders downstream)
   // -------------------------------------------------------------------------
@@ -294,6 +312,7 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       wallpaper: config.wallpaper,
       widgets: config.widgets,
       gestures: config.gestures,
+      pinnedApps: config.pinnedApps,
       isHydrated,
       setParadigm,
       toggleProfile,
@@ -304,16 +323,19 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       setWidgetSettings,
       reorderWidgets,
       setGestureBinding,
+      setPinnedApps,
     }),
     [
       semantics,
       config.paradigm,
       config.activeProfiles,
       config.icons,
+      config.icons.size,
       config.font,
       config.wallpaper,
       config.widgets,
       config.gestures,
+      config.pinnedApps,
       isHydrated,
       setParadigm,
       toggleProfile,
@@ -324,6 +346,7 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       setWidgetSettings,
       reorderWidgets,
       setGestureBinding,
+      setPinnedApps,
     ],
   );
 

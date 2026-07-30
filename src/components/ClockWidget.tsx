@@ -20,6 +20,7 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useWeftConfig } from '../hooks/useWeftConfig';
+import { useAdaptiveText } from '../hooks/useAdaptiveText';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,6 +54,7 @@ function formatDate(d: Date): string {
 
 export const ClockWidget = memo(function ClockWidget() {
   const { semantics } = useWeftConfig();
+  const adaptiveText  = useAdaptiveText();
   const s = semantics;
 
   const [now, setNow] = useState(() => new Date());
@@ -88,8 +90,8 @@ export const ClockWidget = memo(function ClockWidget() {
   const { hours, minutes, ampm } = formatTime(now);
   const dateStr = formatDate(now);
 
-  const textPrimary = s.surface.home.textPrimary;
-  const textSecondary = s.surface.home.textSecondary;
+  const textPrimary   = adaptiveText.textColor;
+  const textSecondary = adaptiveText.textColorSoft;
 
   return (
     <Animated.View style={[styles.root, { opacity, transform: [{ translateY }] }]}>

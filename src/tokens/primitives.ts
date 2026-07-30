@@ -134,45 +134,44 @@ export const alpha = {
  * Liquid Glass — Apple-style layered frosted glass system.
  *
  * Architecture:
- *   Base layer    → deep BlurView (blurRadius 60)
- *   Tint layer    → thin semi-transparent white over the blur
- *   Specular edge → 1px inner border with bright white highlight on top,
- *                   subtle shadow on bottom — simulates refracted light bending
- *                   around the glass edge
- *   Refraction    → slightly lighter tint on one axis to fake depth parallax
+ *   Base layer    → deep BlurView (blurRadius 70)
+ *   Tint layer    → thin semi-transparent cool white over the blur
+ *   Specular edge → bright white inner border on top + subtle shadow on bottom,
+ *                   simulating refracted light bending around the glass edge
+ *   Inner glow    → very faint white radial fill, fakes light trapped in glass
+ *   Refraction    → slightly warm-blue tint offset to fake depth parallax
  *
  * Use liquidGlass.tint as backgroundColor on BlurView containers.
- * Use liquidGlass.specularEdge as borderColor for the inner-glow border.
- * Use liquidGlass.specularTop / specularBottom split via a LinearGradient
- * border overlay for the most premium look.
+ * Use liquidGlass.border as borderColor for the subtle outer ring.
+ * Use liquidGlass.specularBright for pressed/selected highlight states.
  */
 export const liquidGlass = {
-  /** Base tint over deep blur — cool white with subtle blue cast */
-  tint: 'rgba(235,242,252,0.22)',
+  /** Base tint over deep blur — cool white with blue cast, very subtle */
+  tint: 'rgba(220,234,255,0.18)',
   /** Deeper tint for dock and prominent surfaces */
-  tintDeep: 'rgba(220,233,250,0.38)',
+  tintDeep: 'rgba(200,220,255,0.32)',
   /** Maximum tint — used for Vision accessibility cascade */
-  tintMax: 'rgba(210,226,248,0.92)',
+  tintMax: 'rgba(190,215,255,0.92)',
   /** Specular highlight edge (top/left — light hits here) */
-  specularBright: 'rgba(255,255,255,0.70)',
+  specularBright: 'rgba(255,255,255,0.80)',
   /** Specular shadow edge (bottom/right — light exits here) */
-  specularDim: 'rgba(255,255,255,0.18)',
-  /** Unified border for tiles and cards — subtle white ring */
-  border: 'rgba(255,255,255,0.28)',
-  /** Stronger border for dock pill */
-  borderStrong: 'rgba(255,255,255,0.45)',
+  specularDim: 'rgba(255,255,255,0.14)',
+  /** Unified border for tiles and cards — crisp 1px white ring */
+  border: 'rgba(255,255,255,0.32)',
+  /** Stronger border for dock pill and prominent containers */
+  borderStrong: 'rgba(255,255,255,0.55)',
   /** Inner glow — simulates light trapped inside the glass */
-  innerGlow: 'rgba(255,255,255,0.12)',
-  /** Refraction tint — slightly warm offset to fake depth */
-  refraction: 'rgba(180,210,255,0.10)',
+  innerGlow: 'rgba(255,255,255,0.10)',
+  /** Refraction tint — slightly warm-blue offset to fake depth */
+  refraction: 'rgba(160,200,255,0.08)',
   /** Scrim behind modal glass surfaces */
-  scrim: 'rgba(8,16,32,0.72)',
-  /** Dock background — deep dark base so white icons pop */
-  dockBase: 'rgba(12,20,40,0.55)',
-  /** Blur radius for standard glass surfaces */
-  blurRadius: 60,
+  scrim: 'rgba(4,10,24,0.75)',
+  /** Dock background — deep navy base so white icons pop against wallpaper */
+  dockBase: 'rgba(8,16,36,0.60)',
+  /** Blur radius for standard glass surfaces — deep blur for liquid feel */
+  blurRadius: 70,
   /** Blur radius for dock (slightly lighter) */
-  blurRadiusDock: 48,
+  blurRadiusDock: 50,
 } as const;
 
 // ---------------------------------------------------------------------------

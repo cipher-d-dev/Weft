@@ -36,6 +36,8 @@ import {
   Animated,
   BackHandler,
   NativeModules,
+  PermissionsAndroid,
+  Platform,
   StyleSheet,
   View,
   type ViewStyle,
@@ -43,8 +45,8 @@ import {
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WeftConfigProvider } from './src/context/WeftConfigContext';
+import { useWeftConfig } from './src/hooks/useWeftConfig';
 import { HomeScreen } from './src/surfaces/HomeScreen';
-import { ControlCenterScreen } from './src/surfaces/ControlCenterScreen';
 import { CustomizationScreen } from './src/surfaces/CustomizationScreen';
 import { WallpaperPickerSheet } from './src/surfaces/WallpaperPickerSheet';
 import { OnboardingScreen, ONBOARDING_KEY } from './src/surfaces/OnboardingScreen';
@@ -52,6 +54,28 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useAppState } from './src/hooks/useAppState';
 
 const { SetDefaultLauncher } = NativeModules;
+
+// ---------------------------------------------------------------------------
+// Startup permissions — requested once per install, not on every CC open
+// ---------------------------------------------------------------------------
+
+async function requestStartupPermissions() {
+  if (Platform.OS !== 'android') return;
+  try {
+    const perms: string[] = [
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+    ];
+    if ((PermissionsAndroid.PERMISSIONS as Record<string, string>).POST_NOTIFICATIONS) {
+      perms.push((PermissionsAndroid.PERMISSIONS as Record<string, string>).POST_NOTIFICATIONS);
+    }
+    await PermissionsAndroid.requestMultiple(
+      perms as Parameters<typeof PermissionsAndroid.requestMultiple>[0],
+    );
+  } catch {
+    // Non-fatal
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Animation config (shared spring presets)
@@ -76,10 +100,6 @@ const SPRING_CLOSE: Animated.SpringAnimationConfig = {
 // ---------------------------------------------------------------------------
 
 function LauncherRoot({
-  openControlCenter,
-  closeControlCenter,
-  animValue,
-  isOpen,
   openDrawer,
   closeDrawer,
   drawerAnimValue,
@@ -89,10 +109,6 @@ function LauncherRoot({
   wallpaperAnimValue,
   isWallpaperPickerOpen,
 }: {
-  openControlCenter: () => void;
-  closeControlCenter: () => void;
-  animValue: Animated.Value;
-  isOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
   drawerAnimValue: Animated.Value;
@@ -103,21 +119,23 @@ function LauncherRoot({
   isWallpaperPickerOpen: boolean;
 }) {
   const { justResumed } = useAppState();
+  const { setWallpaper } = useWeftConfig();
+
+  const handleWallpaperSet = useCallback(async (dominantColor?: string) => {
+    const { WallpaperModule } = NativeModules;
+    if (WallpaperModule) {
+      try { await WallpaperModule.invalidateCache(); } catch { /* non-fatal */ }
+    }
+    setWallpaper({ source: 'gallery', dominantColor });
+    closeWallpaperPicker();
+  }, [setWallpaper, closeWallpaperPicker]);
 
   return (
     <View style={styles.root}>
       <ErrorBoundary name="Home">
         <HomeScreen
-          onOpenControlCenter={openControlCenter}
           onOpenCustomization={openDrawer}
           resumeKey={justResumed ? Date.now() : 0}
-        />
-      </ErrorBoundary>
-      <ErrorBoundary name="ControlCenter">
-        <ControlCenterScreen
-          animValue={animValue}
-          onDismiss={closeControlCenter}
-          isOpen={isOpen}
         />
       </ErrorBoundary>
       <ErrorBoundary name="Customization">
@@ -127,8 +145,6 @@ function LauncherRoot({
           isOpen={isDrawerOpen}
           onOpenWallpaperPicker={() => {
             closeDrawer();
-            // Small delay so the customization sheet has begun closing
-            // before the wallpaper picker opens — avoids two sheets stacking.
             setTimeout(openWallpaperPicker, 200);
           }}
         />
@@ -138,7 +154,7 @@ function LauncherRoot({
           visible={isWallpaperPickerOpen}
           animValue={wallpaperAnimValue}
           onDismiss={closeWallpaperPicker}
-          onWallpaperSet={() => closeWallpaperPicker()}
+          onWallpaperSet={handleWallpaperSet}
         />
       </ErrorBoundary>
     </View>
@@ -162,9 +178,10 @@ export default function App(): React.JSX.Element {
         const onboarded = value === '1';
         setHasOnboarded(onboarded);
 
-        // For returning users: silently check if Weft is still the default.
-        // If the user changed it, offer to re-set it. No alert on first launch
-        // (onboarding handles that via handleOnboardingComplete).
+        // Request runtime permissions as soon as the launcher is visible,
+        // regardless of whether this is a first or returning launch.
+        requestStartupPermissions();
+
         if (onboarded && SetDefaultLauncher) {
           SetDefaultLauncher.isDefaultLauncher().then((isDefault: boolean) => {
             if (!isDefault) {
@@ -216,19 +233,8 @@ export default function App(): React.JSX.Element {
   }, []);
 
   // ── Control Center ────────────────────────────────────────────────────────
-  const animValue = useRef(new Animated.Value(0)).current;
-  const [isOpen, setIsOpen] = useState(false);
-
-  const openControlCenter = useCallback(() => {
-    setIsOpen(true);
-    Animated.spring(animValue, SPRING_OPEN).start();
-  }, [animValue]);
-
-  const closeControlCenter = useCallback(() => {
-    Animated.spring(animValue, SPRING_CLOSE).start(() => {
-      setIsOpen(false);
-    });
-  }, [animValue]);
+  // Removed: swipe-down now opens the system quick settings panel directly
+  // via SystemGestures.expandQuickSettings() in useGestureHandler.
 
   // ── Customization Drawer ──────────────────────────────────────────────────
   const drawerAnimValue = useRef(new Animated.Value(0)).current;
@@ -261,9 +267,8 @@ export default function App(): React.JSX.Element {
   }, [wallpaperAnimValue]);
 
   // ── Back handler — only active when the launcher is visible ───────────────
-  // Wallpaper picker > drawer (higher z-index) > Control Center.
+  // Wallpaper picker > drawer (higher z-index).
   useEffect(() => {
-    // Don't intercept back while onboarding or splash is shown.
     if (!hasOnboarded) return;
 
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -275,14 +280,10 @@ export default function App(): React.JSX.Element {
         closeDrawer();
         return true;
       }
-      if (isOpen) {
-        closeControlCenter();
-        return true;
-      }
       return false;
     });
     return () => sub.remove();
-  }, [hasOnboarded, isOpen, isDrawerOpen, isWallpaperPickerOpen, closeControlCenter, closeDrawer, closeWallpaperPicker]);
+  }, [hasOnboarded, isDrawerOpen, isWallpaperPickerOpen, closeDrawer, closeWallpaperPicker]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -302,10 +303,6 @@ export default function App(): React.JSX.Element {
         {/* ── Normal launcher ─────────────────────────────────────────── */}
         {hasOnboarded === true && (
           <LauncherRoot
-            openControlCenter={openControlCenter}
-            closeControlCenter={closeControlCenter}
-            animValue={animValue}
-            isOpen={isOpen}
             openDrawer={openDrawer}
             closeDrawer={closeDrawer}
             drawerAnimValue={drawerAnimValue}

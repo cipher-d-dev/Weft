@@ -7,17 +7,7 @@
          list on API 30+ devices. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
-    <!-- Read the system wallpaper so it shows behind the launcher UI.
-         Android 13+ (API 33+) uses READ_WALLPAPER_INTERNAL instead of
-         READ_EXTERNAL_STORAGE for this purpose. Both are declared so the
-         correct one is used on each API level. -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_WALLPAPER_INTERNAL"
-        android:minSdkVersion="33" />
-
-    <!-- Allows setting wallpapers — some devices also require this to READ
-         the wallpaper via WallpaperManager.getDrawable(). -->
+    <!-- Allows setting wallpapers via WallpaperSetModule. -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
     <!-- Lets Weft receive a broadcast when the device finishes booting,

@@ -95,6 +95,47 @@ const ICON_SHAPES: { id: IconShape; label: string; symbol: string }[] = [
 // WallpaperRow — tappable entry row that opens the wallpaper picker
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Row icon helpers — pure View icons, no emoji
+// ---------------------------------------------------------------------------
+
+function ImageIcon({ color, size }: { color: string; size: number }) {
+  const sw = size * 0.1;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.85, height: size * 0.7, borderWidth: sw,
+        borderColor: color, borderRadius: sw * 1.5, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: size * 0.3,
+          backgroundColor: color, opacity: 0.35 }} />
+        <View style={{ width: size * 0.22, height: size * 0.22, borderRadius: size * 0.11,
+          borderWidth: sw, borderColor: color, position: 'absolute', top: sw * 2, left: sw * 2 }} />
+      </View>
+    </View>
+  );
+}
+
+function SwipeUpIcon({ color, size }: { color: string; size: number }) {
+  const sw = size * 0.1;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Upward arrow */}
+      <View style={{ width: 0, height: 0,
+        borderLeftWidth: size * 0.22, borderRightWidth: size * 0.22,
+        borderBottomWidth: size * 0.32,
+        borderLeftColor: 'transparent', borderRightColor: 'transparent',
+        borderBottomColor: color, marginBottom: sw,
+      }} />
+      <View style={{ width: sw * 1.4, height: size * 0.35,
+        borderRadius: sw, backgroundColor: color }} />
+      {/* Base line */}
+      <View style={{ width: size * 0.7, height: sw, borderRadius: sw / 2,
+        backgroundColor: color, marginTop: sw * 1.5 }} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WallpaperRow
 const WallpaperRow = memo(function WallpaperRow({
   onPress,
   rowBg,
@@ -119,7 +160,7 @@ const WallpaperRow = memo(function WallpaperRow({
       accessibilityLabel="Change wallpaper"
       style={[styles.wallpaperRow, { backgroundColor: rowBg, borderColor: rowBorder }]}
     >
-      <Text style={styles.wallpaperIcon}>🖼</Text>
+      <ImageIcon color={textSecondary} size={22} />
       <View style={styles.wallpaperRowText}>
         <Text style={[styles.wallpaperRowTitle, { color: textPrimary }]}>Wallpaper</Text>
         <Text style={[styles.wallpaperRowSub, { color: textSecondary }]}>
@@ -159,7 +200,7 @@ const GestureRow = memo(function GestureRow({
       accessibilityLabel="Configure gesture bindings"
       style={[styles.wallpaperRow, { backgroundColor: rowBg, borderColor: rowBorder }]}
     >
-      <Text style={styles.wallpaperIcon}>👆</Text>
+      <SwipeUpIcon color={textSecondary} size={22} />
       <View style={styles.wallpaperRowText}>
         <Text style={[styles.wallpaperRowTitle, { color: textPrimary }]}>Gestures</Text>
         <Text style={[styles.wallpaperRowSub, { color: textSecondary }]}>
@@ -520,7 +561,8 @@ export const CustomizationScreen = memo(function CustomizationScreen({
             accessibilityRole="button"
             accessibilityLabel="Close customisation"
           >
-            <Text style={[styles.closeBtnText, { color: cs.textSecondary }]}>✕</Text>
+            <View style={styles.closeXBar1} />
+            <View style={styles.closeXBar2} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: cs.textPrimary }]}>
             Customise
@@ -699,7 +741,7 @@ export const CustomizationScreen = memo(function CustomizationScreen({
               activeOpacity={0.7}
             >
               <Text style={[styles.devResetText, { color: s.surface.customization.textSecondary }]}>
-                ⚙ Dev: Reset onboarding
+                Dev: Reset onboarding
               </Text>
             </TouchableOpacity>
           )}
@@ -749,6 +791,22 @@ const styles = StyleSheet.create({
   closeBtnText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  closeXBar1: {
+    position: 'absolute',
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    transform: [{ rotate: '45deg' }],
+  },
+  closeXBar2: {
+    position: 'absolute',
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    transform: [{ rotate: '-45deg' }],
   },
   scrollContent: {
     paddingHorizontal: 16,

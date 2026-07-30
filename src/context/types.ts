@@ -6,6 +6,12 @@
  * can both import from one place without a circular dependency.
  */
 
+import { Dimensions, PixelRatio } from 'react-native';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+// Base size 60dp but scale slightly for large screens (tablets etc)
+const defaultIconSize = SCREEN_W >= 480 ? 72 : 60;
+
 // ---------------------------------------------------------------------------
 // Paradigm
 // ---------------------------------------------------------------------------
@@ -126,6 +132,12 @@ export type WeftConfig = {
   wallpaper: WallpaperConfig;
   widgets: WidgetConfig[];
   gestures: GestureBindings;
+  /**
+   * Ordered list of package names pinned to the home grid.
+   * Empty array = home screen is intentionally empty (default).
+   * The user adds apps via "Add to Home" from the All Apps drawer.
+   */
+  pinnedApps: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -136,7 +148,7 @@ export const DEFAULT_CONFIG: WeftConfig = {
   paradigm: 'skeuo',
   activeProfiles: [],
   icons: {
-    size: 60,
+    size: defaultIconSize,
     shape: 'squircle',
     packPackageName: null,
     labelVisible: true,
@@ -150,9 +162,10 @@ export const DEFAULT_CONFIG: WeftConfig = {
   },
   widgets: [],
   gestures: {
-    swipeDown: 'controlCenter',
+    swipeDown: 'quickSettings',
     swipeUp: 'allApps',
     swipeLeft: 'none',
     swipeRight: 'none',
   },
+  pinnedApps: [],
 };

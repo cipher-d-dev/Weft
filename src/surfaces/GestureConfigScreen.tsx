@@ -20,23 +20,222 @@ import { useWeftConfig } from '../hooks/useWeftConfig';
 import type { GestureAction, GestureBindings } from '../context/types';
 
 // ---------------------------------------------------------------------------
+// Tiny View-based icons — no emoji, no native icon library
+// ---------------------------------------------------------------------------
+
+function IconArrowDown({ color }: { color: string }) {
+  return (
+    <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 2, height: 14, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{
+        position: 'absolute', bottom: 2,
+        width: 10, height: 10,
+        borderRightWidth: 2, borderBottomWidth: 2,
+        borderColor: color,
+        transform: [{ rotate: '45deg' }],
+      }} />
+    </View>
+  );
+}
+
+function IconArrowUp({ color }: { color: string }) {
+  return (
+    <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 2, height: 14, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{
+        position: 'absolute', top: 2,
+        width: 10, height: 10,
+        borderLeftWidth: 2, borderTopWidth: 2,
+        borderColor: color,
+        transform: [{ rotate: '45deg' }],
+      }} />
+    </View>
+  );
+}
+
+function IconArrowLeft({ color }: { color: string }) {
+  return (
+    <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 14, height: 2, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{
+        position: 'absolute', left: 2,
+        width: 10, height: 10,
+        borderLeftWidth: 2, borderBottomWidth: 2,
+        borderColor: color,
+        transform: [{ rotate: '45deg' }],
+      }} />
+    </View>
+  );
+}
+
+function IconArrowRight({ color }: { color: string }) {
+  return (
+    <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 14, height: 2, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{
+        position: 'absolute', right: 2,
+        width: 10, height: 10,
+        borderRightWidth: 2, borderTopWidth: 2,
+        borderColor: color,
+        transform: [{ rotate: '45deg' }],
+      }} />
+    </View>
+  );
+}
+
+/** Gear / settings icon */
+function IconGear({ color }: { color: string }) {
+  const s = 22;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{
+        width: s * 0.55, height: s * 0.55,
+        borderRadius: s * 0.275,
+        borderWidth: s * 0.1,
+        borderColor: color,
+      }} />
+      {[0, 45, 90, 135].map(deg => (
+        <View key={deg} style={{
+          position: 'absolute',
+          width: s * 0.18, height: s * 0.95,
+          borderRadius: s * 0.09,
+          backgroundColor: color,
+          transform: [{ rotate: `${deg}deg` }],
+          opacity: 0.9,
+        }} />
+      ))}
+    </View>
+  );
+}
+
+/** Phone outline */
+function IconPhone({ color }: { color: string }) {
+  const s = 22;
+  return (
+    <View style={{
+      width: s * 0.6, height: s,
+      borderWidth: s * 0.09,
+      borderColor: color,
+      borderRadius: s * 0.12,
+    }}>
+      <View style={{
+        width: s * 0.25, height: s * 0.06,
+        backgroundColor: color,
+        borderRadius: s * 0.03,
+        alignSelf: 'center',
+        marginTop: s * 0.08,
+      }} />
+    </View>
+  );
+}
+
+/** Bell icon */
+function IconBell({ color }: { color: string }) {
+  const s = 22;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{
+        width: s * 0.65, height: s * 0.6,
+        borderTopLeftRadius: s * 0.325,
+        borderTopRightRadius: s * 0.325,
+        borderWidth: s * 0.1,
+        borderColor: color,
+        marginTop: s * 0.1,
+      }} />
+      <View style={{
+        width: s * 0.85, height: s * 0.1,
+        backgroundColor: color,
+        borderRadius: s * 0.05,
+        marginTop: 1,
+      }} />
+      <View style={{
+        width: s * 0.25, height: s * 0.12,
+        borderBottomLeftRadius: s * 0.125,
+        borderBottomRightRadius: s * 0.125,
+        borderWidth: s * 0.09,
+        borderTopWidth: 0,
+        borderColor: color,
+        marginTop: 1,
+      }} />
+    </View>
+  );
+}
+
+/** Lightning bolt */
+function IconBolt({ color }: { color: string }) {
+  const s = 22;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{
+        width: 0, height: 0,
+        borderLeftWidth: s * 0.32,
+        borderRightWidth: 0,
+        borderBottomWidth: s * 0.55,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: color,
+        position: 'absolute', top: 0, left: s * 0.22,
+      }} />
+      <View style={{
+        width: 0, height: 0,
+        borderLeftWidth: s * 0.32,
+        borderRightWidth: 0,
+        borderTopWidth: s * 0.55,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: color,
+        position: 'absolute', bottom: 0, right: s * 0.22,
+      }} />
+    </View>
+  );
+}
+
+/** Stacked bars / recent apps */
+function IconStack({ color }: { color: string }) {
+  const s = 22;
+  return (
+    <View style={{ width: s, height: s, justifyContent: 'center', gap: 3 }}>
+      {[0.9, 0.75, 0.6].map((w, i) => (
+        <View key={i} style={{
+          width: s * w, height: s * 0.12,
+          backgroundColor: color,
+          borderRadius: s * 0.06,
+          alignSelf: 'flex-start',
+        }} />
+      ))}
+    </View>
+  );
+}
+
+/** Dash — for "None" action */
+function IconDash({ color }: { color: string }) {
+  return (
+    <View style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 14, height: 2, backgroundColor: color, borderRadius: 1 }} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Action labels
 // ---------------------------------------------------------------------------
 
-const ACTION_LABELS: Record<GestureAction, { label: string; icon: string }> = {
-  none: { label: 'None', icon: '—' },
-  controlCenter: { label: 'Control Center', icon: '⚙️' },
-  allApps: { label: 'All Apps', icon: '📱' },
-  notifications: { label: 'Notifications', icon: '🔔' },
-  quickSettings: { label: 'Quick Settings', icon: '⚡' },
-  recentApps: { label: 'Recent Apps', icon: '📊' },
+type IconComponent = React.FC<{ color: string }>;
+
+const ACTION_LABELS: Record<GestureAction, { label: string; Icon: IconComponent }> = {
+  none:          { label: 'None',           Icon: IconDash  },
+  controlCenter: { label: 'Control Center', Icon: IconGear  },
+  allApps:       { label: 'All Apps',       Icon: IconPhone },
+  notifications: { label: 'Notifications',  Icon: IconBell  },
+  quickSettings: { label: 'Quick Settings', Icon: IconBolt  },
+  recentApps:    { label: 'Recent Apps',    Icon: IconStack },
 };
 
-const DIRECTION_LABELS: Record<keyof GestureBindings, { label: string; icon: string }> = {
-  swipeDown: { label: 'Swipe Down', icon: '⬇️' },
-  swipeUp: { label: 'Swipe Up', icon: '⬆️' },
-  swipeLeft: { label: 'Swipe Left', icon: '⬅️' },
-  swipeRight: { label: 'Swipe Right', icon: '➡️' },
+const DIRECTION_LABELS: Record<keyof GestureBindings, { label: string; Icon: IconComponent }> = {
+  swipeDown:  { label: 'Swipe Down',  Icon: IconArrowDown  },
+  swipeUp:    { label: 'Swipe Up',    Icon: IconArrowUp    },
+  swipeLeft:  { label: 'Swipe Left',  Icon: IconArrowLeft  },
+  swipeRight: { label: 'Swipe Right', Icon: IconArrowRight },
 };
 
 // ---------------------------------------------------------------------------
@@ -83,14 +282,19 @@ function DirectionCard({
       accessibilityLabel={`${dirInfo.label}, currently set to ${actionInfo.label}`}
     >
       <View style={styles.cardLeft}>
-        <Text style={styles.directionIcon}>{dirInfo.icon}</Text>
+        <View style={styles.iconCell}>
+          <dirInfo.Icon color={textSecondary} />
+        </View>
         <View style={styles.cardLabels}>
           <Text style={[styles.directionLabel, { color: textPrimary }]}>
             {dirInfo.label}
           </Text>
-          <Text style={[styles.actionLabel, { color: accentColor }]}>
-            {actionInfo.icon} {actionInfo.label}
-          </Text>
+          <View style={styles.actionLabelRow}>
+            <actionInfo.Icon color={accentColor} />
+            <Text style={[styles.actionLabel, { color: accentColor }]}>
+              {actionInfo.label}
+            </Text>
+          </View>
         </View>
       </View>
       <Text style={[styles.chevron, { color: textSecondary }]}>›</Text>
@@ -158,9 +362,12 @@ function ActionPickerSheet({
           ]}
           onStartShouldSetResponder={() => true}
         >
-          <Text style={[styles.sheetTitle, { color: textPrimary }]}>
-            {dirInfo.icon} {dirInfo.label}
-          </Text>
+          <View style={styles.sheetTitleRow}>
+            <dirInfo.Icon color={textPrimary} />
+            <Text style={[styles.sheetTitle, { color: textPrimary }]}>
+              {dirInfo.label}
+            </Text>
+          </View>
           <Text style={[styles.sheetSubtitle, { color: textSecondary }]}>
             Choose an action
           </Text>
@@ -189,7 +396,9 @@ function ActionPickerSheet({
                   accessibilityRole="radio"
                   accessibilityState={{ checked: isSelected }}
                 >
-                  <Text style={styles.actionIcon}>{actionInfo.icon}</Text>
+                  <View style={styles.iconCell}>
+                    <actionInfo.Icon color={isSelected ? accentColor : textSecondary} />
+                  </View>
                   <Text style={[styles.actionRowLabel, { color: textPrimary }]}>
                     {actionInfo.label}
                   </Text>
@@ -379,16 +588,24 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  directionIcon: {
-    fontSize: 28,
+  iconCell: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardLabels: {
     flex: 1,
-    gap: 3,
+    gap: 4,
   },
   directionLabel: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  actionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   actionLabel: {
     fontSize: 13,
@@ -413,6 +630,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
+  sheetTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   sheetSubtitle: {
     fontSize: 13,
     fontWeight: '400',
@@ -429,9 +653,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     gap: 12,
-  },
-  actionIcon: {
-    fontSize: 22,
   },
   actionRowLabel: {
     flex: 1,

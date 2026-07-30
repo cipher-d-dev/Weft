@@ -288,7 +288,7 @@ export function semanticsGlass(): AppSemantics {
         searchBarBorder: liquidGlass.border,
         searchBarText: neutral[0],
         searchBarPlaceholder: `rgba(255,255,255,${opacity[40]})`,
-        handleColor: liquidGlass.border,
+        handleColor: liquidGlass.borderStrong,
         indexBarText: `rgba(255,255,255,${opacity[50]})`,
         indexBarActiveText: accentBlue[300],
         sectionHeaderText: `rgba(255,255,255,${opacity[60]})`,
@@ -316,11 +316,12 @@ export function semanticsGlass(): AppSemantics {
         labelColor: neutral[0],
         chipBackground: `rgba(33,150,243,${opacity[40]})`,
         chipForeground: neutral[0],
-        border: liquidGlass.border,       // subtle inner ring
+        // Crisp 1px specular border — key liquid glass detail
+        border: liquidGlass.border,
         radius: radii.xl,
         touchTarget: 64,
         padding: spacing[4],
-        shadow: elevation.none,           // No shadow — depth via glass tint + border
+        shadow: elevation.none,
         labelType: typography.labelSm,
         chipType: typography.captionMd,
       },
@@ -342,8 +343,8 @@ export function semanticsGlass(): AppSemantics {
         touchTarget: 44,
       },
       sectionHeader: {
-        textColor: neutral[0],
-        plateBackground: liquidGlass.innerGlow,  // subtle inner glow plate
+        textColor: `rgba(255,255,255,${opacity[80]})`,
+        plateBackground: liquidGlass.innerGlow,
         plateRadius: radii.sm,
         platePaddingV: spacing[1],
         platePaddingH: spacing[3],
@@ -352,39 +353,45 @@ export function semanticsGlass(): AppSemantics {
       widgetCard: {
         background: liquidGlass.tint,
         border: liquidGlass.border,
-        radius: radii.xl,
+        radius: radii['2xl'],
         padding: spacing[4],
         shadow: elevation.none,
       },
       dock: {
-        background: liquidGlass.dockBase,   // Deep dark base so white icons pop
-        border: liquidGlass.borderStrong,   // Stronger border for prominence
+        // Deep, nearly-opaque navy base — the dock is a grounding element
+        // that anchors the floating glass UI to the bottom of the screen.
+        // The borderStrong creates the characteristic glass pill edge.
+        background: liquidGlass.dockBase,
+        border: liquidGlass.borderStrong,
         radius: radii['2xl'],
         height: 80,
         paddingH: spacing[6],
-        shadow: elevation.none,             // Glass never uses elevation shadows
+        shadow: elevation.none,
       },
       appIcon: {
         containerSize: 60,
+        // Squircle at 0.28 gives the rounded-corner square look of iOS app
+        // icons — more premium than a circle, more characterful than a rect.
+        // This is set via the icon shape token in paradigm defaults.
         radius: radii.lg,
         shadow: {
           elevation: 0,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.55,
-          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.60,
+          shadowRadius: 14,
         },
         labelColor: neutral[0],
         labelType: typography.captionMd,
         labelTextShadow: {
-          color: 'rgba(0,0,0,0.65)',
+          color: 'rgba(0,0,0,0.75)',
           offset: { width: 0, height: 1 },
-          radius: 5,
+          radius: 6,
         },
       },
       glassContainer: {
-        tint: liquidGlass.tint,               // Base liquid glass tint
-        blurRadius: liquidGlass.blurRadius,   // 60pt deep blur
+        tint: liquidGlass.tint,
+        blurRadius: liquidGlass.blurRadius,   // 70pt — deep cinematic blur
         radius: radii['2xl'],
       },
       contextMenu: {
@@ -404,7 +411,7 @@ export function semanticsGlass(): AppSemantics {
         textColor: neutral[0],
         fontSize: 9,
         size: 16,
-        borderColor: 'rgba(0,0,0,0.5)',
+        borderColor: 'rgba(0,0,0,0.55)',
         borderWidth: 1.5,
       },
     },
@@ -511,7 +518,7 @@ export function semanticsMinimal(): AppSemantics {
         background: neutral[950],
         cardBackground: neutral[900],
         cardRadius: radii.md,
-        selectedBorder: accentSage[400],
+        selectedBorder: accentSage[500],
         selectedBorderWidth: 2,
         categoryChipBackground: neutral[800],
         categoryChipText: neutral[200],

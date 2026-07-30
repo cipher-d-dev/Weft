@@ -28,7 +28,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
   BackHandler,
-  Dimensions,
   FlatList,
   Image,
   Linking,
@@ -36,6 +35,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +46,7 @@ import { useWeftConfig } from '../hooks/useWeftConfig';
 import { useInstalledApps } from '../hooks/useInstalledApps';
 import { useNotificationBadges } from '../hooks/useNotificationBadges';
 import { useGestureHandler } from '../hooks/useGestureHandler';
+import { useAdaptiveText } from '../hooks/useAdaptiveText';
 import { AppIcon } from '../components/AppIcon';
 import { AppContextMenu } from '../components/AppContextMenu';
 import { AppGridSkeleton } from '../components/AppGridSkeleton';
@@ -74,6 +75,30 @@ const DOCK_PACKAGES = [
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+/** Gear / settings icon — pure View, no emoji or native icon lib */
+function GearIcon({ color, size }: { color: string; size: number }) {
+  const r = size * 0.28;
+  const spoke = size * 0.09;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Center circle */}
+      <View style={{ width: r * 2, height: r * 2, borderRadius: r,
+        borderWidth: spoke, borderColor: color, position: 'absolute' }} />
+      {/* 8 spokes */}
+      {[0, 45, 90, 135].map((deg) => (
+        <View key={deg} style={{
+          position: 'absolute', width: spoke * 1.6, height: size * 0.82,
+          borderRadius: spoke, backgroundColor: 'transparent',
+          borderLeftWidth: spoke, borderRightWidth: spoke,
+          borderTopWidth: size * 0.1, borderBottomWidth: size * 0.1,
+          borderColor: color,
+          transform: [{ rotate: `${deg}deg` }],
+        }} />
+      ))}
+    </View>
+  );
+}
 
 /** Single app icon cell rendered inside the page grid. */
 const AppGridItem = React.memo(function AppGridItem({
@@ -160,57 +185,38 @@ function DockApps({
 }
 
 // ---------------------------------------------------------------------------
-// FloatingCustomiseButton — pill that floats above the dock
+// DockCustomiseButton — small icon button tucked at the right end of the dock
 // ---------------------------------------------------------------------------
 
 /**
- * Absolutely-positioned pill centered horizontally, sitting 8dp above the
- * top edge of the dock. Does not affect layout flow.
+ * A compact icon-only button rendered inside the dock row, right-aligned.
+ * Replaces the floating pill — less intrusive, always visible, contextually
+ * placed where the user is already looking (the dock).
  */
-function FloatingCustomiseButton({
+function DockCustomiseButton({
   onPress,
-  dockHeight,
-  bottomInset,
   isDark,
 }: {
   onPress?: () => void;
-  dockHeight: number;
-  bottomInset: number;
   isDark: boolean;
 }) {
-  const bottomOffset = bottomInset + dockHeight + 8;
-
-  // Use white or dark pill depending on whether the paradigm has a dark background
-  // Using hardcoded rgba instead of hex-appending to variable color strings
-  // (which breaks on rgba() values like Glass/Minimal textSecondary)
-  const bgColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.10)';
-  const borderColor = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.15)';
-  const textColor = isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.55)';
+  const bgColor     = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  const borderColor = isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.12)';
+  const iconColor   = isDark ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.50)';
 
   return (
     <TouchableOpacity
       onPress={onPress}
       style={[
-        styles.floatingPill,
-        {
-          bottom: bottomOffset,
-          backgroundColor: bgColor,
-          borderColor: borderColor,
-        },
+        styles.dockCustomiseBtn,
+        { backgroundColor: bgColor, borderColor: borderColor },
       ]}
       accessible
       accessibilityLabel="Customise launcher"
       accessibilityRole="button"
-      activeOpacity={0.7}
+      activeOpacity={0.65}
     >
-      <Text
-        style={[
-          styles.floatingPillText,
-          { color: textColor },
-        ]}
-      >
-        ✦ Customise
-      </Text>
+      <GearIcon color={iconColor} size={17} />
     </TouchableOpacity>
   );
 }
@@ -238,9 +244,8 @@ function PageDots({
     return null;
   }
 
-  // Sit 8dp above the FloatingCustomiseButton (which is dockHeight+8+bottomInset from bottom).
-  // FloatingCustomiseButton pill height ~28dp. So dots sit at dockHeight+8+bottomInset+28+8.
-  const bottomOffset = bottomInset + dockHeight + 8 + 28 + 8;
+  // Sit 10dp above the dock pill top edge
+  const bottomOffset = bottomInset + dockHeight + 10;
 
   return (
     <View
@@ -268,8 +273,6 @@ function PageDots({
 // ---------------------------------------------------------------------------
 
 type HomeScreenProps = {
-  /** Called when a downward swipe from the top edge is detected. */
-  onOpenControlCenter?: () => void;
   /** Called when the user taps the customize gear in the dock. */
   onOpenCustomization?: () => void;
   /** Called when the All Apps drawer should open (swipe-up gesture). */
@@ -283,14 +286,25 @@ type HomeScreenProps = {
   resumeKey?: number;
 };
 
-export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAllApps, resumeKey = 0 }: HomeScreenProps): React.JSX.Element {
-  const { semantics, paradigm } = useWeftConfig();
+export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }: HomeScreenProps): React.JSX.Element {
+  const { semantics, paradigm, pinnedApps, setPinnedApps } = useWeftConfig();
   const insets = useSafeAreaInsets();
   const { apps, loading, error } = useInstalledApps();
   const { badges, clearBadge } = useNotificationBadges();
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const adaptiveText = useAdaptiveText();
 
   const s = semantics;
   const layout = s.layout;
+
+  // ── Desktop apps — only pinned apps; empty home grid until user adds some ─
+  const desktopApps = useMemo(() => {
+    if (pinnedApps.length === 0) return []; // intentionally empty home screen
+    const byPkg = new Map(apps.map(a => [a.packageName, a]));
+    return pinnedApps
+      .map(pkg => byPkg.get(pkg))
+      .filter((a): a is NonNullable<typeof a> => a !== undefined);
+  }, [pinnedApps, apps]);
 
   // ── Current page tracking ─────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(0);
@@ -353,14 +367,17 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
     app: AppDetail,
     position: { x: number; y: number; width: number; height: number },
   ) => {
+    if (!editMode) {
+      setEditMode(true);
+    }
     setContextMenu({
       visible: true,
       packageName: app.packageName,
       appLabel: app.label,
-      isSystemApp: false, // react-native-launcher-kit doesn't expose this; default false
+      isSystemApp: false,
       anchorPosition: position,
     });
-  }, []);
+  }, [editMode]);
 
   const dismissContextMenu = useCallback(() => {
     setContextMenu(prev => (prev ? { ...prev, visible: false } : null));
@@ -368,7 +385,6 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
 
   // ── Gesture handler — 4-direction swipes with configurable bindings ──────
   const gestureHandler = useGestureHandler({
-    onOpenControlCenter,
     onOpenAllApps: openAllApps,
   });
 
@@ -386,9 +402,8 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
       : layout.screenPaddingH;
 
   // Use actual screen width so the grid is always centered on any device.
-  // Dimensions.get('window') returns the correct dp width accounting for
-  // density — no re-render on orientation change since launchers are portrait-locked.
-  const SCREEN_WIDTH = Dimensions.get('window').width;
+  // useWindowDimensions() returns the correct dp width accounting for
+  // density and reacts to orientation/resize changes.
   const availableWidth = SCREEN_WIDTH - paddingLeft - paddingRight;
   const totalGapWidth = layout.gridGap * (layout.gridColumns - 1);
   const cellWidth = (availableWidth - totalGapWidth) / layout.gridColumns;
@@ -403,15 +418,15 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
   const appsPerPage = layout.gridColumns * 4;
 
   const pages = useMemo<AppDetail[][]>(() => {
-    if (apps.length === 0) {
+    if (desktopApps.length === 0) {
       return [];
     }
     const result: AppDetail[][] = [];
-    for (let i = 0; i < apps.length; i += appsPerPage) {
-      result.push(apps.slice(i, i + appsPerPage));
+    for (let i = 0; i < desktopApps.length; i += appsPerPage) {
+      result.push(desktopApps.slice(i, i + appsPerPage));
     }
     return result;
-  }, [apps, appsPerPage]);
+  }, [desktopApps, appsPerPage]);
 
   // ── Page scroll handler ───────────────────────────────────────────────────
   const handlePageScroll = useCallback(
@@ -504,21 +519,30 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <TouchableOpacity
+    <View
       style={[styles.root, { backgroundColor: 'transparent' }]}
-      activeOpacity={1}
-      onLongPress={() => { if (!editMode) setEditMode(true); }}
-      delayLongPress={600}
       accessible={false}
       {...gestureHandler.panHandlers}
     >
       {/* ── Wallpaper layer — sits behind all content ──────────────── */}
-      <WallpaperBackground key={resumeKey || undefined} screenWidth={SCREEN_WIDTH} scrollX={scrollX} />
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onLongPress={() => {
+          if (!editMode) {
+            setEditMode(true);
+          }
+        }}
+        delayLongPress={600}
+        accessible={false}
+      >
+        <WallpaperBackground key={resumeKey || undefined} screenWidth={SCREEN_WIDTH} scrollX={scrollX} />
+      </TouchableOpacity>
 
       <StatusBar
         backgroundColor="transparent"
         translucent
-        barStyle={paradigm === 'skeuo' ? 'dark-content' : 'light-content'}
+        barStyle={adaptiveText.isDark ? 'light-content' : 'dark-content'}
       />
 
       {/* ── Loading state — skeleton grid ─────────────────────────────── */}
@@ -535,24 +559,27 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
       {/* ── Error state ───────────────────────────────────────────────── */}
       {!loading && error !== null && (
         <View style={styles.centred}>
-          <Text style={[styles.errorText, { color: s.surface.home.textPrimary }]}>
+          <Text style={[styles.errorText, { color: adaptiveText.textColor }]}>
             Could not load apps
           </Text>
-          <Text style={[styles.errorSub, { color: s.surface.home.textSecondary }]}>
+          <Text style={[styles.errorSub, { color: adaptiveText.textColorSoft }]}>
             {error.message}
           </Text>
         </View>
       )}
 
-      {/* ── Empty state ───────────────────────────────────────────────── */}
-      {!loading && error === null && apps.length === 0 && (
+      {/* ── Empty home state ──────────────────────────────────────────── */}
+      {!loading && error === null && desktopApps.length === 0 && (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>📱</Text>
-          <Text style={[styles.emptyTitle, { color: s.surface.home.textPrimary }]}>
-            No apps found
+          <View style={[styles.emptyPhoneOuter, { borderColor: adaptiveText.textColorSoft }]}>
+            <View style={[styles.emptyPhoneScreen, { backgroundColor: adaptiveText.textColorSoft }]} />
+            <View style={[styles.emptyPhoneBtn,   { backgroundColor: adaptiveText.textColorSoft }]} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: adaptiveText.textColor }]}>
+            Home is empty
           </Text>
-          <Text style={[styles.emptySub, { color: s.surface.home.textSecondary }]}>
-            Pull down to refresh
+          <Text style={[styles.emptySub, { color: adaptiveText.textColorSoft }]}>
+            Swipe up to open All Apps{'\n'}then long-press any app to add it here
           </Text>
         </View>
       )}
@@ -586,46 +613,36 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
           count={pages.length}
           activeIndex={currentPage}
           accentColor={s.accent.primary}
-          inactiveColor={`${s.surface.home.textSecondary}4D`} // 30% opacity ≈ hex 4D
+          inactiveColor={`${s.surface.home.textSecondary}4D`}
           dockHeight={s.component.dock.height}
           bottomInset={insets.bottom}
         />
-      )}
-
-      {/* ── Floating customise pill — hidden in edit mode ─────────────── */}
-      {!loading && !editMode && (
-        <FloatingCustomiseButton
-          onPress={onOpenCustomization}
-          dockHeight={s.component.dock.height}
-          bottomInset={insets.bottom}
-          isDark={paradigm !== 'skeuo'}
-        />
-      )}
-
-      {/* ── Edit mode Done button — replaces customise pill ───────────── */}
-      {!loading && editMode && (
-        <TouchableOpacity
-          onPress={() => setEditMode(false)}
-          style={[
-            styles.editDoneBtn,
-            {
-              bottom: insets.bottom + s.component.dock.height + 8,
-              backgroundColor: s.accent.primary,
-            },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Done editing"
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.editDoneBtnText, { color: s.accent.onAccent }]}>
-            Done
-          </Text>
-        </TouchableOpacity>
       )}
 
       {/* ── Dock — always rendered, even during app list refresh ─────── */}
       <Dock style={{ paddingBottom: insets.bottom }}>
         <DockApps allApps={apps} badges={badges} />
+        {/* Customise button — right-aligned inside dock, only outside edit mode */}
+        {!editMode && (
+          <DockCustomiseButton
+            onPress={onOpenCustomization}
+            isDark={paradigm !== 'skeuo'}
+          />
+        )}
+        {/* Done button replaces customise in edit mode */}
+        {editMode && (
+          <TouchableOpacity
+            onPress={() => setEditMode(false)}
+            style={[styles.dockDoneBtn, { backgroundColor: s.accent.primary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Done editing"
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.dockDoneBtnText, { color: s.accent.onAccent }]}>
+              Done
+            </Text>
+          </TouchableOpacity>
+        )}
       </Dock>
 
       {/* ── Swipe-up handle — hints at the All Apps drawer ────────────── */}
@@ -650,6 +667,14 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
         isOpen={isAllAppsOpen}
         onDismiss={closeAllApps}
         apps={apps}
+        onAddToDock={(app) => {
+          // Pin app to home grid (avoid duplicates)
+          setPinnedApps(
+            pinnedApps.includes(app.packageName)
+              ? pinnedApps
+              : [...pinnedApps, app.packageName],
+          );
+        }}
       />
 
       {/* ── App Context Menu ──────────────────────────────────────────── */}
@@ -679,11 +704,21 @@ export function HomeScreen({ onOpenControlCenter, onOpenCustomization, onOpenAll
             await Linking.openURL(`package:${contextMenu.packageName}`);
             dismissContextMenu();
           }}
-          onAddToDock={() => dismissContextMenu()}
-          onRemoveFromHome={() => dismissContextMenu()}
+          onAddToDock={() => {
+            setPinnedApps(
+              pinnedApps.includes(contextMenu.packageName)
+                ? pinnedApps
+                : [...pinnedApps, contextMenu.packageName],
+            );
+            dismissContextMenu();
+          }}
+          onRemoveFromHome={() => {
+            setPinnedApps(pinnedApps.filter(p => p !== contextMenu.packageName));
+            dismissContextMenu();
+          }}
         />
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -739,21 +774,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // ── Floating pill ──
-  floatingPill: {
-    position: 'absolute',
-    alignSelf: 'center',
-    // bottom applied inline
+  // ── Dock customise icon button ──
+  dockCustomiseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  dockCustomiseBtnIcon: {
+    fontSize: 17,
+    includeFontPadding: false,
+    lineHeight: 19,
+  },
+  // ── Dock done button (edit mode) ──
+  dockDoneBtn: {
     paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 16,
+    marginLeft: 4,
   },
-  floatingPillText: {
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 0.8,
-    textAlign: 'center',
+  dockDoneBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   // ── Page dots ──
   pageDotsContainer: {
@@ -778,9 +824,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  emptyEmoji: {
-    fontSize: 56,
-    textAlign: 'center',
+  emptyPhoneOuter: {
+    width: 44,
+    height: 72,
+    borderRadius: 8,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    opacity: 0.55,
+    marginBottom: 4,
+  },
+  emptyPhoneScreen: {
+    width: 24,
+    height: 28,
+    borderRadius: 3,
+    opacity: 0.6,
+  },
+  emptyPhoneBtn: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    opacity: 0.5,
   },
   emptyTitle: {
     fontSize: 18,
@@ -804,18 +869,5 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 2,
     opacity: 0.35,
-  },
-  // ── Edit mode ──
-  editDoneBtn: {
-    position: 'absolute',
-    alignSelf: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  editDoneBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.3,
   },
 });

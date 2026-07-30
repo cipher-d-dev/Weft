@@ -170,24 +170,30 @@ export const WallpaperBackground = memo(function WallpaperBackground({
   }, []);
 
   // ── Crossfade on paradigm change ──────────────────────────────────────
+  // Two-layer crossfade: keep the outgoing tint visible while fading in the
+  // new tint on top, so there's never a flash to the raw wallpaper between
+  // paradigm switches.
+  const [prevActiveDef, setPrevActiveDef] = useState<typeof activeDef | null>(null);
+  const outgoingOpacity = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (prevParadigm.current === paradigm) return;
     prevParadigm.current = paradigm;
 
-    // Fade out → swap → fade in
-    Animated.timing(fadeAnim, {
+    // Snapshot the outgoing tint, show it as an overlay, switch the base
+    // layer, then fade the overlay out.
+    setPrevActiveDef(activeDef);
+    outgoingOpacity.setValue(1);
+    setActiveDef(PARADIGM_STYLES[paradigm]);
+    Animated.timing(outgoingOpacity, {
       toValue: 0,
-      duration: 150,
+      duration: 320,
       useNativeDriver: true,
     }).start(() => {
-      setActiveDef(PARADIGM_STYLES[paradigm]);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      setPrevActiveDef(null);
     });
-  }, [paradigm, fadeAnim]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paradigm]);
 
   // ── Update system UI to match paradigm ───────────────────────────────
   useEffect(() => {
@@ -205,24 +211,11 @@ export const WallpaperBackground = memo(function WallpaperBackground({
   const hlTop = -(hlSize * 0.15);
   const hlLeft = (screenWidth - hlSize) / 2;
 
-  // Parallax: wallpaper translates at 15% of the page scroll speed in the
-  // opposite direction — subtle depth as the user swipes between pages.
-  const parallaxX = scrollX
-    ? scrollX.interpolate({
-        inputRange: [0, screenWidth],
-        outputRange: [0, -screenWidth * 0.15],
-        extrapolate: 'extend',
-      })
-    : null;
-
   return (
     <Animated.View
       style={[
         StyleSheet.absoluteFill,
-        {
-          opacity: fadeAnim,
-          transform: parallaxX ? [{ translateX: parallaxX }] : [],
-        },
+        { opacity: fadeAnim },
       ]}
     >
       {wallpaperUri ? (
@@ -235,14 +228,19 @@ export const WallpaperBackground = memo(function WallpaperBackground({
             onLoad={() => setWallpaperLoaded(true)}
             fadeDuration={0}
           />
-          {/* Paradigm tint overlay — gives each paradigm its character
-              while still showing the real wallpaper photo behind it */}
+          {/* Active paradigm tint */}
           <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: activeDef.tint },
-            ]}
+            style={[StyleSheet.absoluteFill, { backgroundColor: activeDef.tint }]}
           />
+          {/* Outgoing paradigm tint — fades out during crossfade */}
+          {prevActiveDef !== null && (
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: prevActiveDef.tint, opacity: outgoingOpacity },
+              ]}
+            />
+          )}
         </>
       ) : (
         /* ── JS fallback gradient simulation ───────────────────────── */
@@ -259,6 +257,12 @@ export const WallpaperBackground = memo(function WallpaperBackground({
               left: hlLeft,
             }}
           />
+          {/* Outgoing paradigm overlay for fallback mode too */}
+          {prevActiveDef !== null && (
+            <Animated.View
+              style={[StyleSheet.absoluteFill, { backgroundColor: prevActiveDef.base, opacity: outgoingOpacity }]}
+            />
+          )}
         </View>
       )}
     </Animated.View>

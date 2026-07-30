@@ -11,13 +11,19 @@
  *   - swipeRight: rightward horizontal swipe (default: none)
  *
  * Returns a PanResponder that can be spread onto the root View.
+ *
+ * Implementation note:
+ *   PanResponder.create() is called once and must not re-run (doing so
+ *   breaks touch tracking mid-gesture). All mutable state — gesture bindings,
+ *   callbacks, thresholds — is kept in refs so the single PanResponder
+ *   always sees the latest values without being recreated.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { NativeModules, PanResponder, Vibration } from 'react-native';
 import type { GestureResponderEvent, PanResponderGestureState } from 'react-native';
 import { useWeftConfig } from './useWeftConfig';
-import type { GestureAction } from '../context/types';
+import type { GestureAction, GestureBindings } from '../context/types';
 
 // ---------------------------------------------------------------------------
 // Native module
@@ -41,11 +47,11 @@ export type GestureCallbacks = {
 // Gesture detection thresholds
 // ---------------------------------------------------------------------------
 
-const VERTICAL_THRESHOLD = 60;    // dp — minimum dy to trigger up/down
-const HORIZONTAL_THRESHOLD = 100; // dp — minimum dx to trigger left/right
-const VERTICAL_RATIO = 1.5;       // dy must be > |dx| * ratio for vertical
-const HORIZONTAL_RATIO = 1.3;     // |dx| must be > dy * ratio for horizontal
-const TOP_ZONE_HEIGHT = 120;      // dp — swipeDown only triggers if started near top
+const VERTICAL_THRESHOLD = 50;    // dp — minimum dy to trigger up/down (lowered for responsiveness)
+const HORIZONTAL_THRESHOLD = 80;  // dp — minimum dx to trigger left/right
+const VERTICAL_RATIO = 1.2;       // dy must be > |dx| * ratio for vertical
+const HORIZONTAL_RATIO = 1.2;     // |dx| must be > dy * ratio for horizontal
+const TOP_ZONE_HEIGHT = 140;      // dp — swipeDown only triggers if started near top
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -54,14 +60,18 @@ const TOP_ZONE_HEIGHT = 120;      // dp — swipeDown only triggers if started n
 export function useGestureHandler(callbacks: GestureCallbacks) {
   const { gestures } = useWeftConfig();
 
-  // Keep callbacks fresh without recreating PanResponder
-  const callbacksRef = useRef(callbacks);
-  callbacksRef.current = callbacks;
+  // Keep callbacks and bindings in refs — PanResponder reads these directly
+  // so it never has stale closures even though it's created only once.
+  const callbacksRef  = useRef(callbacks);
+  const gesturesRef   = useRef<GestureBindings>(gestures);
+
+  // Sync refs on every render
+  useEffect(() => { callbacksRef.current  = callbacks; });
+  useEffect(() => { gesturesRef.current   = gestures;  }, [gestures]);
 
   // Execute an action based on the config binding
   const executeAction = useCallback((action: GestureAction) => {
     const cbs = callbacksRef.current;
-
     switch (action) {
       case 'controlCenter':
         cbs.onOpenControlCenter?.();
@@ -72,54 +82,48 @@ export function useGestureHandler(callbacks: GestureCallbacks) {
         Vibration.vibrate(30);
         break;
       case 'notifications':
-        if (SystemGestures?.expandNotifications) {
-          SystemGestures.expandNotifications();
-          Vibration.vibrate(20);
-        }
+        SystemGestures?.expandNotifications?.();
+        Vibration.vibrate(20);
         break;
       case 'quickSettings':
-        if (SystemGestures?.expandQuickSettings) {
-          SystemGestures.expandQuickSettings();
-          Vibration.vibrate(20);
-        }
+        SystemGestures?.expandQuickSettings?.();
+        Vibration.vibrate(20);
         break;
       case 'recentApps':
-        if (SystemGestures?.showRecentApps) {
-          SystemGestures.showRecentApps();
-          Vibration.vibrate(40);
-        }
+        SystemGestures?.showRecentApps?.();
+        Vibration.vibrate(40);
         break;
       case 'none':
-        // No-op
         break;
     }
   }, []);
 
-  // Detect gesture direction from PanResponderGestureState
-  const detectDirection = useCallback(
-    (
-      _evt: GestureResponderEvent,
-      gs: PanResponderGestureState,
-    ): GestureAction | null => {
-      const { dy, dx, moveY } = gs;
-      const startedNearTop = moveY < TOP_ZONE_HEIGHT;
+  // Keep executeAction in a ref too so PanResponder can call the latest version
+  const executeActionRef = useRef(executeAction);
+  useEffect(() => { executeActionRef.current = executeAction; }, [executeAction]);
 
-      // Downward swipe from top edge
+  // Detect gesture direction — reads from gesturesRef so always fresh
+  const detectDirectionRef = useRef(
+    (evt: GestureResponderEvent, gs: PanResponderGestureState): GestureAction | null => {
+      const { dy, dx, y0 } = gs;
+      // y0 is the start Y coordinate of the gesture — more reliable than moveY
+      const startedNearTop = y0 < TOP_ZONE_HEIGHT;
+
+      // Downward swipe from top edge only
       if (
         dy > VERTICAL_THRESHOLD &&
         dy > Math.abs(dx) * VERTICAL_RATIO &&
         startedNearTop
       ) {
-        return gestures.swipeDown;
+        return gesturesRef.current.swipeDown;
       }
 
-      // Upward swipe from anywhere below top zone
+      // Upward swipe — anywhere on screen
       if (
         dy < -VERTICAL_THRESHOLD &&
-        Math.abs(dy) > Math.abs(dx) * VERTICAL_RATIO &&
-        !startedNearTop
+        Math.abs(dy) > Math.abs(dx) * VERTICAL_RATIO
       ) {
-        return gestures.swipeUp;
+        return gesturesRef.current.swipeUp;
       }
 
       // Leftward horizontal swipe
@@ -127,7 +131,7 @@ export function useGestureHandler(callbacks: GestureCallbacks) {
         dx < -HORIZONTAL_THRESHOLD &&
         Math.abs(dx) > Math.abs(dy) * HORIZONTAL_RATIO
       ) {
-        return gestures.swipeLeft;
+        return gesturesRef.current.swipeLeft;
       }
 
       // Rightward horizontal swipe
@@ -135,24 +139,34 @@ export function useGestureHandler(callbacks: GestureCallbacks) {
         dx > HORIZONTAL_THRESHOLD &&
         dx > Math.abs(dy) * HORIZONTAL_RATIO
       ) {
-        return gestures.swipeRight;
+        return gesturesRef.current.swipeRight;
       }
 
       return null;
     },
-    [gestures],
   );
 
-  // Create PanResponder (only once, uses refs for callbacks)
+  // Single PanResponder instance — uses refs internally so it never goes stale
   const panResponder = useRef(
     PanResponder.create({
+      // Claim the gesture only once the user has moved enough to indicate intent
       onMoveShouldSetPanResponder: (evt, gs) => {
-        return detectDirection(evt, gs) !== null;
+        return detectDirectionRef.current(evt, gs) !== null;
+      },
+      // Prevent child views from stealing the gesture once we've claimed it
+      onMoveShouldSetPanResponderCapture: (_evt, gs) => {
+        const { dy, dx } = gs;
+        const isVertical = Math.abs(dy) > Math.abs(dx) * VERTICAL_RATIO;
+        const isHorizontal = Math.abs(dx) > Math.abs(dy) * HORIZONTAL_RATIO;
+        return (
+          (isVertical && Math.abs(dy) > VERTICAL_THRESHOLD * 0.6) ||
+          (isHorizontal && Math.abs(dx) > HORIZONTAL_THRESHOLD * 0.6)
+        );
       },
       onPanResponderRelease: (evt, gs) => {
-        const action = detectDirection(evt, gs);
+        const action = detectDirectionRef.current(evt, gs);
         if (action && action !== 'none') {
-          executeAction(action);
+          executeActionRef.current(action);
         }
       },
     }),

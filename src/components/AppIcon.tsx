@@ -13,9 +13,16 @@
  * - Notification badge (top-right) from badgeCount prop
  * - Edit mode delete handle (top-left ✕) when editMode=true
  *
+ * Shape clipping:
+ *   squircle       — large uniform border radius (0.45 × size)
+ *   circle         — border radius = size / 2
+ *   rounded-square — moderate border radius (0.22 × size)
+ *   teardrop       — three large corners + one tight corner (bottom-right)
+ *   hexagon        — two overlapping rotated rectangles clipped to a hex
+ *
  * Shadow architecture:
- * - Shadow on outer un-clipped View (overflow:hidden kills Android elevation)
- * - overflow:hidden on an inner child View for icon clipping
+ * - Shadow on the shadowContainer View
+ * - overflow:hidden on shadowContainer clips the icon to the shape
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -29,6 +36,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useWeftConfig } from '../hooks/useWeftConfig';
+import type { IconShape } from '../context/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +56,86 @@ type AppIconProps = {
 };
 
 // ---------------------------------------------------------------------------
+// Shape clip helpers
+// ---------------------------------------------------------------------------
+
+function getShapeRadius(shape: IconShape, size: number): {
+  borderTopLeftRadius: number;
+  borderTopRightRadius: number;
+  borderBottomLeftRadius: number;
+  borderBottomRightRadius: number;
+} | null {
+  switch (shape) {
+    case 'circle':
+      return {
+        borderTopLeftRadius: size / 2,
+        borderTopRightRadius: size / 2,
+        borderBottomLeftRadius: size / 2,
+        borderBottomRightRadius: size / 2,
+      };
+    case 'squircle':
+      return {
+        borderTopLeftRadius: size * 0.45,
+        borderTopRightRadius: size * 0.45,
+        borderBottomLeftRadius: size * 0.45,
+        borderBottomRightRadius: size * 0.45,
+      };
+    case 'rounded-square':
+      return {
+        borderTopLeftRadius: size * 0.22,
+        borderTopRightRadius: size * 0.22,
+        borderBottomLeftRadius: size * 0.22,
+        borderBottomRightRadius: size * 0.22,
+      };
+    case 'teardrop':
+      return {
+        borderTopLeftRadius: size * 0.44,
+        borderTopRightRadius: size * 0.44,
+        borderBottomLeftRadius: size * 0.44,
+        borderBottomRightRadius: size * 0.08,
+      };
+    case 'hexagon':
+      return null; // handled via HexagonClip
+  }
+}
+
+function HexagonClip({ size, children }: { size: number; children: React.ReactNode }) {
+  const w = size;
+  const h = size * 0.866;
+
+  return (
+    <View style={{ width: w, height: w, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', width: w, height: h, top: (w - h) / 2, overflow: 'hidden' }}>
+        <View
+          style={{
+            position: 'absolute',
+            width: w * 0.866,
+            height: w * 0.866,
+            left: w * 0.067,
+            top: 0,
+            transform: [{ rotate: '30deg' }],
+            overflow: 'hidden',
+          }}
+        >
+          <View
+            style={{
+              position: 'absolute',
+              width: w * 0.866,
+              height: w * 0.866,
+              transform: [{ rotate: '-30deg' }],
+              left: -w * 0.067,
+              top: -(w - h) / 2,
+            }}
+          >
+            {children}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -61,9 +149,11 @@ const AppIcon = React.memo<AppIconProps>(({
   editMode = false,
   badgeCount = 0,
 }) => {
-  const { semantics } = useWeftConfig();
-  const ai = semantics.component.appIcon;
-  const nb = semantics.component.notificationBadge;
+  const { semantics, icons } = useWeftConfig();
+  const ai   = semantics.component.appIcon;
+  const nb   = semantics.component.notificationBadge;
+  const size  = ai.containerSize;
+  const shape = icons.shape;
 
   const scaleAnim    = useRef(new Animated.Value(1)).current;
   const opacityAnim  = useRef(new Animated.Value(1)).current;
@@ -71,7 +161,7 @@ const AppIcon = React.memo<AppIconProps>(({
   const wiggleLoop   = useRef<Animated.CompositeAnimation | null>(null);
   const containerRef = useRef<View>(null);
 
-  // ── Wiggle on editMode change ─────────────────────────────────────────────
+  // ── Wiggle ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (editMode) {
       const phaseDelay = Math.random() * 120;
@@ -96,23 +186,43 @@ const AppIcon = React.memo<AppIconProps>(({
     outputRange: ['-3deg', '0deg', '3deg'],
   });
 
-  // ── Press squish ──────────────────────────────────────────────────────────
+  // ── Press handlers ────────────────────────────────────────────────────────
   const handlePressIn = useCallback(() => {
     if (editMode) return;
-    Animated.spring(scaleAnim, { toValue: 0.88, tension: 300, friction: 10, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, {
+      toValue: 0.86,
+      tension: 400,
+      friction: 12,
+      useNativeDriver: true,
+    }).start();
   }, [scaleAnim, editMode]);
 
   const handlePressOut = useCallback(() => {
     if (editMode) return;
-    Animated.spring(scaleAnim, { toValue: 1, tension: 300, friction: 12, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      tension: 300,
+      friction: 14,
+      useNativeDriver: true,
+    }).start();
   }, [scaleAnim, editMode]);
 
-  // ── Launch transition ─────────────────────────────────────────────────────
   const handlePress = useCallback(() => {
     if (editMode || !onPress) return;
+    // Brief haptic tap on launch
+    Vibration.vibrate(10);
     Animated.sequence([
-      Animated.spring(scaleAnim, { toValue: 1.08, tension: 400, friction: 8, useNativeDriver: true }),
-      Animated.timing(opacityAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
+      Animated.spring(scaleAnim, {
+        toValue: 1.06,
+        tension: 500,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
     ]).start(() => {
       onPress();
       setTimeout(() => {
@@ -122,7 +232,6 @@ const AppIcon = React.memo<AppIconProps>(({
     });
   }, [editMode, onPress, scaleAnim, opacityAnim]);
 
-  // ── Long press ────────────────────────────────────────────────────────────
   const handleLongPress = useCallback(() => {
     Vibration.vibrate(50);
     if (onLongPressPosition && containerRef.current) {
@@ -133,6 +242,11 @@ const AppIcon = React.memo<AppIconProps>(({
       onLongPress?.();
     }
   }, [onLongPress, onLongPressPosition]);
+
+  // ── Shape ─────────────────────────────────────────────────────────────────
+  const shapeRadius  = getShapeRadius(shape, size);
+  const isHexagon    = shape === 'hexagon';
+  const shadowRadius = shapeRadius ? shapeRadius.borderTopLeftRadius : size * 0.45;
 
   const showBadge = badgeCount > 0;
   const isDot     = badgeCount === 1;
@@ -159,14 +273,14 @@ const AppIcon = React.memo<AppIconProps>(({
           { transform: [{ scale: scaleAnim }, { rotate: wiggleRotate }], opacity: opacityAnim },
         ]}
       >
-        {/* Shadow carrier — no overflow:hidden so Android elevation renders */}
+        {/* Icon container — shadow + shape clip */}
         <View
           style={[
             styles.shadowContainer,
             {
-              width: ai.containerSize,
-              height: ai.containerSize,
-              borderRadius: ai.radius,
+              width: size,
+              height: size,
+              borderRadius: shadowRadius,
               elevation: ai.shadow.elevation,
               shadowColor: ai.shadow.shadowColor,
               shadowOffset: ai.shadow.shadowOffset,
@@ -174,15 +288,16 @@ const AppIcon = React.memo<AppIconProps>(({
               shadowRadius: ai.shadow.shadowRadius,
               backgroundColor: '#FFFFFF',
             },
+            shapeRadius ?? undefined,
           ]}
         >
-          {/* Clip container — overflow:hidden here clips the icon image */}
-          <View style={[styles.clipContainer, { borderRadius: ai.radius }]}>
-            {icon}
-          </View>
+          {isHexagon
+            ? <HexagonClip size={size}>{icon}</HexagonClip>
+            : <View style={[styles.clipContainer, shapeRadius ?? { borderRadius: shadowRadius }]}>{icon}</View>
+          }
         </View>
 
-        {/* Notification badge — top-right */}
+        {/* Notification badge */}
         {showBadge && (
           <View
             style={[
@@ -201,20 +316,18 @@ const AppIcon = React.memo<AppIconProps>(({
             accessible={false}
           >
             {!isDot && (
-              <Text
-                style={[styles.badgeText, { color: nb.textColor, fontSize: nb.fontSize }]}
-                numberOfLines={1}
-              >
+              <Text style={[styles.badgeText, { color: nb.textColor, fontSize: nb.fontSize }]} numberOfLines={1}>
                 {badgeCount > 99 ? '99+' : badgeCount}
               </Text>
             )}
           </View>
         )}
 
-        {/* Edit mode delete handle — top-left */}
+        {/* Edit mode delete handle — View-based X, no emoji */}
         {editMode && (
           <View style={styles.deleteHandle}>
-            <Text style={styles.deleteText}>✕</Text>
+            <View style={[styles.deleteXBar, { transform: [{ rotate: '45deg' }] }]} />
+            <View style={[styles.deleteXBar, { transform: [{ rotate: '-45deg' }] }]} />
           </View>
         )}
 
@@ -256,7 +369,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   shadowContainer: {
-    backgroundColor: 'transparent',
+    overflow: 'hidden',
   },
   clipContainer: {
     width: '100%',
@@ -295,12 +408,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 4,
   },
-  deleteText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 12,
-    includeFontPadding: false,
+  deleteXBar: {
+    position: 'absolute',
+    width: 10,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#ffffff',
   },
 });
 

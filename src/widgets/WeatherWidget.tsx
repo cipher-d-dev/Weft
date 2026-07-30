@@ -12,6 +12,44 @@ import { registerWidget } from './WidgetRegistry';
 import type { WidgetProps } from './WidgetRegistry';
 
 // ---------------------------------------------------------------------------
+// Sun icon — pure View, no emoji
+// ---------------------------------------------------------------------------
+
+function SunIcon({ color, size }: { color: string; size: number }) {
+  const r = size * 0.28;
+  const rays = [0, 45, 90, 135];
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Core circle */}
+      <View style={{
+        width: r * 2,
+        height: r * 2,
+        borderRadius: r,
+        backgroundColor: color,
+      }} />
+      {/* Rays — 4 pairs (0°/180°, 45°/225°, 90°/270°, 135°/315°) */}
+      {rays.map(deg => (
+        <View
+          key={deg}
+          style={{
+            position: 'absolute',
+            width: size * 0.12,
+            height: size,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            transform: [{ rotate: `${deg}deg` }],
+          }}
+          pointerEvents="none"
+        >
+          <View style={{ width: size * 0.1, height: size * 0.14, backgroundColor: color, borderRadius: size * 0.05 }} />
+          <View style={{ width: size * 0.1, height: size * 0.14, backgroundColor: color, borderRadius: size * 0.05 }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -24,14 +62,13 @@ function WeatherWidget({ settings }: WidgetProps) {
     condition: settings.condition || 'Sunny',
     temperature: settings.temperature || 72,
     location: settings.location || 'San Francisco',
-    icon: '☀️', // Could map condition → emoji
   };
 
   return (
     <View style={styles.container}>
       {/* Left side: icon + temp */}
       <View style={styles.leftSide}>
-        <Text style={styles.weatherIcon}>{weatherData.icon}</Text>
+        <SunIcon color={s.surface.home.textPrimary} size={40} />
         <Text
           style={[
             styles.temperature,
@@ -89,9 +126,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  weatherIcon: {
-    fontSize: 40,
-  },
   temperature: {
     fontSize: 36,
     fontWeight: '300',
@@ -118,7 +152,7 @@ const styles = StyleSheet.create({
 registerWidget({
   id: 'weather',
   name: 'Weather',
-  icon: '☀️',
+  icon: 'sun',
   description: 'Current weather conditions',
   defaultSettings: {
     condition: 'Sunny',
