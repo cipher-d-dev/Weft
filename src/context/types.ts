@@ -84,6 +84,46 @@ export type WallpaperConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Folders
+// ---------------------------------------------------------------------------
+
+/**
+ * A folder groups multiple apps on the home screen into a single tappable
+ * icon. Folders are rendered as a 2×2 grid of mini app icons.
+ */
+export type FolderItem = {
+  /** Unique identifier (UUID-style string). */
+  id: string;
+  /** User-visible folder name (e.g. "Google", "Social", "Work"). */
+  name: string;
+  /**
+   * Ordered list of package names inside this folder.
+   * The first 4 are shown as the folder cover preview.
+   */
+  packageNames: string[];
+  /**
+   * Auto-categorization category this folder was created from.
+   * null = manually created by the user.
+   */
+  category: AppCategory | null;
+};
+
+/**
+ * App categories used for auto-grouping on first run and new installs.
+ * Each category maps to a set of package-name prefix patterns.
+ */
+export type AppCategory =
+  | 'google'
+  | 'social'
+  | 'messaging'
+  | 'media'
+  | 'games'
+  | 'productivity'
+  | 'utilities'
+  | 'system'
+  | 'other';
+
+// ---------------------------------------------------------------------------
 // Widgets
 // ---------------------------------------------------------------------------
 
@@ -138,6 +178,18 @@ export type WeftConfig = {
    * The user adds apps via "Add to Home" from the All Apps drawer.
    */
   pinnedApps: string[];
+  /**
+   * Folders on the home grid. Each folder occupies one cell in pinnedApps
+   * using a special "folder:<id>" key so position is preserved.
+   */
+  folders: FolderItem[];
+  /**
+   * Version of the home-screen seeding logic that was last applied.
+   * Bump CURRENT_SEED_VERSION in HomeScreen when seeding changes so
+   * existing users get their home re-seeded on the next launch.
+   * 0 = never seeded (default / fresh install).
+   */
+  seedVersion: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -168,4 +220,6 @@ export const DEFAULT_CONFIG: WeftConfig = {
     swipeRight: 'none',
   },
   pinnedApps: [],
+  folders: [],
+  seedVersion: 0,
 };

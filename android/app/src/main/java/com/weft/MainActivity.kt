@@ -20,12 +20,16 @@ class MainActivity : ReactActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // ── Splash → App theme swap ───────────────────────────────────────
-        // Set the theme to AppTheme before super.onCreate so the splash
-        // windowBackground (set in AndroidManifest via android:theme="@style/SplashTheme")
-        // is replaced before React Native draws its first frame.
-        // This gives us: SplashTheme (dark bg / logo) → AppTheme (transparent)
-        // with zero white flash.
-        setTheme(R.style.AppTheme)
+        // Do NOT call setTheme() here — keep SplashTheme (with its
+        // windowBackground pointing at splash_background.xml / splash_logo)
+        // visible until React Native renders its first frame.
+        //
+        // AppTheme is applied after React Native's content view is attached
+        // via onWindowFocusChanged, which fires once the JS bundle is ready
+        // and RN has drawn at least one frame.  This keeps the branded splash
+        // on-screen instead of the default white/transparent window.
+        //
+        // Note: super.onCreate() is called with SplashTheme still active.
 
         super.onCreate(savedInstanceState)
 
@@ -49,5 +53,22 @@ class MainActivity : ReactActivity() {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.isAppearanceLightStatusBars = false
         controller.isAppearanceLightNavigationBars = false
+    }
+
+    // ── Splash dismiss — clear the splash windowBackground once RN has focus ──
+    // onWindowFocusChanged fires when the window becomes interactive, which is
+    // after React Native has rendered at least one frame.  At that point we
+    // switch to AppTheme and clear the window background so the wallpaper/RN
+    // surface shows through cleanly.
+    private var splashDismissed = false
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !splashDismissed) {
+            splashDismissed = true
+            setTheme(R.style.AppTheme)
+            // Clear the window background so the RN transparent surface shows
+            window.setBackgroundDrawable(null)
+        }
     }
 }

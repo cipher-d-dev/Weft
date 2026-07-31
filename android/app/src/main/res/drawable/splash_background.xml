@@ -4,28 +4,27 @@
 
     Layer-list drawable used as the windowBackground during launch.
     Layer 0: solid dark background (#080C12 matches the JS onboarding bg)
-    Layer 1: the logo image, centered
+    Layer 1: the logo image, centered at 100dp × 100dp
 
-    To use your own logo:
-      1. Place splash_logo.png in android/app/src/main/res/drawable/
-      2. Done — this file already references @drawable/splash_logo
-      3. Adjust android:width / android:height if needed (default 120dp × 120dp)
+    The inner <bitmap> uses android:gravity="center" with a fixed item size
+    so the logo is always a fixed small size in the middle of the screen,
+    regardless of the source PNG dimensions.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Layer 0: Dark launch background -->
+    <!-- Layer 0: Dark launch background — fills the entire window -->
     <item>
         <color android:color="#080C12" />
     </item>
 
-    <!-- Layer 1: Centered logo -->
+    <!-- Layer 1: Centered logo at 100dp × 100dp -->
     <item
         android:gravity="center"
-        android:width="120dp"
-        android:height="120dp">
+        android:width="100dp"
+        android:height="100dp">
         <bitmap
             android:src="@drawable/splash_logo"
-            android:gravity="center"
+            android:gravity="fill"
             android:tileMode="disabled" />
     </item>
 

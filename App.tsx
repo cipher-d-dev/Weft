@@ -48,6 +48,7 @@ import { WeftConfigProvider } from './src/context/WeftConfigContext';
 import { useWeftConfig } from './src/hooks/useWeftConfig';
 import { HomeScreen } from './src/surfaces/HomeScreen';
 import { CustomizationScreen } from './src/surfaces/CustomizationScreen';
+import { GestureConfigScreen } from './src/surfaces/GestureConfigScreen';
 import { WallpaperPickerSheet } from './src/surfaces/WallpaperPickerSheet';
 import { OnboardingScreen, ONBOARDING_KEY } from './src/surfaces/OnboardingScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -121,12 +122,32 @@ function LauncherRoot({
   const { justResumed } = useAppState();
   const { setWallpaper } = useWeftConfig();
 
+  // Single counter that increments on every event that should refresh the
+  // wallpaper: app resume AND in-app wallpaper set.  Passed as a string key
+  // to WallpaperBackground so it re-mounts and re-fetches each time.
+  const wallpaperRefreshKey = useRef(0);
+  const [wallpaperKey, setWallpaperKey] = useState(0);
+
+  // Bump when app resumes from background
+  useEffect(() => {
+    if (justResumed) {
+      wallpaperRefreshKey.current += 1;
+      setWallpaperKey(wallpaperRefreshKey.current);
+    }
+  }, [justResumed]);
+
+  // ── Gesture Config ────────────────────────────────────────────────────────
+  const [isGestureConfigOpen, setIsGestureConfigOpen] = useState(false);
+
   const handleWallpaperSet = useCallback(async (dominantColor?: string) => {
     const { WallpaperModule } = NativeModules;
     if (WallpaperModule) {
       try { await WallpaperModule.invalidateCache(); } catch { /* non-fatal */ }
     }
     setWallpaper({ source: 'gallery', dominantColor });
+    // Bump key to re-mount WallpaperBackground and read the freshly set wallpaper
+    wallpaperRefreshKey.current += 1;
+    setWallpaperKey(wallpaperRefreshKey.current);
     closeWallpaperPicker();
   }, [setWallpaper, closeWallpaperPicker]);
 
@@ -135,7 +156,7 @@ function LauncherRoot({
       <ErrorBoundary name="Home">
         <HomeScreen
           onOpenCustomization={openDrawer}
-          resumeKey={justResumed ? Date.now() : 0}
+          resumeKey={wallpaperKey}
         />
       </ErrorBoundary>
       <ErrorBoundary name="Customization">
@@ -147,6 +168,10 @@ function LauncherRoot({
             closeDrawer();
             setTimeout(openWallpaperPicker, 200);
           }}
+          onOpenGestureConfig={() => {
+            closeDrawer();
+            setTimeout(() => setIsGestureConfigOpen(true), 200);
+          }}
         />
       </ErrorBoundary>
       <ErrorBoundary name="WallpaperPicker">
@@ -157,6 +182,13 @@ function LauncherRoot({
           onWallpaperSet={handleWallpaperSet}
         />
       </ErrorBoundary>
+
+      {/* ── Gesture Config — full-screen slide-over ──────────────────── */}
+      {isGestureConfigOpen && (
+        <View style={StyleSheet.absoluteFill}>
+          <GestureConfigScreen onBack={() => setIsGestureConfigOpen(false)} />
+        </View>
+      )}
     </View>
   );
 }

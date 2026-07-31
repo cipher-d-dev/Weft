@@ -41,17 +41,23 @@ export type GestureCallbacks = {
   onOpenNotifications?: () => void;
   onOpenQuickSettings?: () => void;
   onOpenRecentApps?: () => void;
+  /** Called when the user long-presses on empty wallpaper space. */
+  onLongPressBackground?: () => void;
 };
 
 // ---------------------------------------------------------------------------
-// Gesture detection thresholds
+// Thresholds
 // ---------------------------------------------------------------------------
 
-const VERTICAL_THRESHOLD = 50;    // dp — minimum dy to trigger up/down (lowered for responsiveness)
-const HORIZONTAL_THRESHOLD = 80;  // dp — minimum dx to trigger left/right
-const VERTICAL_RATIO = 1.2;       // dy must be > |dx| * ratio for vertical
-const HORIZONTAL_RATIO = 1.2;     // |dx| must be > dy * ratio for horizontal
-const TOP_ZONE_HEIGHT = 140;      // dp — swipeDown only triggers if started near top
+const VERTICAL_THRESHOLD = 50;
+const HORIZONTAL_THRESHOLD = 80;
+const VERTICAL_RATIO = 1.2;
+const HORIZONTAL_RATIO = 1.2;
+const TOP_ZONE_HEIGHT = 140;
+/** Minimum movement (dp) before we cancel the long-press timer. */
+const LONG_PRESS_CANCEL_SLOP = 8;
+/** Delay (ms) before the long-press fires. */
+const LONG_PRESS_DELAY = 500;
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -102,6 +108,18 @@ export function useGestureHandler(callbacks: GestureCallbacks) {
   const executeActionRef = useRef(executeAction);
   useEffect(() => { executeActionRef.current = executeAction; }, [executeAction]);
 
+  // Long-press timer — started in onStartShouldSetPanResponder, cancelled on
+  // any movement or when a swipe gesture is claimed.
+  const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired  = useRef(false);
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current !== null) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   // Detect gesture direction — reads from gesturesRef so always fresh
   const detectDirectionRef = useRef(
     (evt: GestureResponderEvent, gs: PanResponderGestureState): GestureAction | null => {
@@ -149,28 +167,63 @@ export function useGestureHandler(callbacks: GestureCallbacks) {
   // Single PanResponder instance — uses refs internally so it never goes stale
   const panResponder = useRef(
     PanResponder.create({
-      // Claim the gesture only once the user has moved enough to indicate intent
+      // ── Long-press timer ──────────────────────────────────────────────────
+      // We observe every touch-start via onStartShouldSetPanResponder but
+      // return FALSE so we never steal the responder from children.
+      // The timer starts here and is cancelled by any significant movement
+      // or when the PanResponder itself claims the gesture for a swipe.
+      onStartShouldSetPanResponder: () => {
+        // Start timer — cancelled on move or gesture claim
+        cancelLongPress();
+        longPressFired.current = false;
+        longPressTimer.current = setTimeout(() => {
+          longPressFired.current = true;
+          Vibration.vibrate(40);
+          callbacksRef.current.onLongPressBackground?.();
+        }, LONG_PRESS_DELAY);
+        return false; // don't claim — children handle their own taps
+      },
+      onStartShouldSetPanResponderCapture: () => false,
+
+      // Claim the gesture once movement confirms a directional swipe
       onMoveShouldSetPanResponder: (evt, gs) => {
+        const { dx, dy } = gs;
+        if (Math.abs(dx) > LONG_PRESS_CANCEL_SLOP || Math.abs(dy) > LONG_PRESS_CANCEL_SLOP) {
+          cancelLongPress();
+        }
         return detectDirectionRef.current(evt, gs) !== null;
       },
-      // Prevent child views from stealing the gesture once we've claimed it
+      // Capture strong directional movements to prevent FlatList stealing them
       onMoveShouldSetPanResponderCapture: (_evt, gs) => {
         const { dy, dx } = gs;
-        const isVertical = Math.abs(dy) > Math.abs(dx) * VERTICAL_RATIO;
+        if (Math.abs(dx) > LONG_PRESS_CANCEL_SLOP || Math.abs(dy) > LONG_PRESS_CANCEL_SLOP) {
+          cancelLongPress();
+        }
+        const isVertical   = Math.abs(dy) > Math.abs(dx) * VERTICAL_RATIO;
         const isHorizontal = Math.abs(dx) > Math.abs(dy) * HORIZONTAL_RATIO;
         return (
-          (isVertical && Math.abs(dy) > VERTICAL_THRESHOLD * 0.6) ||
+          (isVertical   && Math.abs(dy) > VERTICAL_THRESHOLD * 0.6) ||
           (isHorizontal && Math.abs(dx) > HORIZONTAL_THRESHOLD * 0.6)
         );
       },
+      onPanResponderGrant: () => {
+        // We claimed for a swipe — long-press is no longer relevant
+        cancelLongPress();
+      },
       onPanResponderRelease: (evt, gs) => {
-        const action = detectDirectionRef.current(evt, gs);
-        if (action && action !== 'none') {
-          executeActionRef.current(action);
+        cancelLongPress();
+        if (!longPressFired.current) {
+          const action = detectDirectionRef.current(evt, gs);
+          if (action && action !== 'none') {
+            executeActionRef.current(action);
+          }
         }
+      },
+      onPanResponderTerminate: () => {
+        cancelLongPress();
       },
     }),
   ).current;
 
-  return panResponder;
+  return { panHandlers: panResponder.panHandlers };
 }

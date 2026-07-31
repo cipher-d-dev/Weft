@@ -49,6 +49,8 @@ type AppContextMenuProps = {
   onUninstall: () => void;
   onAddToDock: () => void;
   onRemoveFromHome: () => void;
+  /** Optional: opens a folder picker for this app. */
+  onMoveToFolder?: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -61,7 +63,7 @@ const SPRING_CONFIG = {
   useNativeDriver: true,
 } as const;
 
-const CARD_WIDTH = 248;
+const CARD_WIDTH = 210;
 
 // ---------------------------------------------------------------------------
 // Inline vector icons — pure View/StyleSheet, zero native dependencies
@@ -131,6 +133,25 @@ function IconRemove({ color, size }: { color: string; size: number }) {
 }
 
 /** Trash bin */
+
+/** Folder — rounded tab on top of a rectangle */
+function IconFolder({ color, size }: { color: string; size: number }) {
+  const sw = size * 0.09;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Tab */}
+      <View style={{ position: 'absolute', top: size * 0.12, left: size * 0.08,
+        width: size * 0.38, height: sw * 1.6, borderRadius: sw,
+        backgroundColor: color }} />
+      {/* Body */}
+      <View style={{ position: 'absolute', top: size * 0.24, left: size * 0.08,
+        right: size * 0.08, bottom: size * 0.14,
+        borderWidth: sw, borderColor: color, borderRadius: sw * 1.5 }} />
+    </View>
+  );
+}
+
+
 function IconTrash({ color, size }: { color: string; size: number }) {
   const sw = size * 0.08;
   return (
@@ -169,6 +190,7 @@ const AppContextMenu = React.memo<AppContextMenuProps>(
     onUninstall,
     onAddToDock,
     onRemoveFromHome,
+    onMoveToFolder,
   }) => {
     const { semantics, activeProfiles } = useWeftConfig();
     const cm = semantics.component.contextMenu;
@@ -222,6 +244,7 @@ const AppContextMenu = React.memo<AppContextMenuProps>(
     const handleAppInfo     = useCallback(() => { onDismiss(); onAppInfo(); },        [onDismiss, onAppInfo]);
     const handleAddToDock   = useCallback(() => { onDismiss(); onAddToDock(); },      [onDismiss, onAddToDock]);
     const handleRemove      = useCallback(() => { onDismiss(); onRemoveFromHome(); }, [onDismiss, onRemoveFromHome]);
+    const handleMoveToFolder = useCallback(() => { onDismiss(); onMoveToFolder?.(); }, [onDismiss, onMoveToFolder]);
     const handleUninstall   = useCallback(() => {
       if (isSystemApp) return;
       onDismiss(); onUninstall();
@@ -304,6 +327,16 @@ const AppContextMenu = React.memo<AppContextMenuProps>(
               label="Remove from Home"
               cm={cm}
               onPress={handleRemove}
+            />
+          )}
+
+          {/* Move to Folder — shown when handler provided and not in Cognitive */}
+          {!isCognitive && onMoveToFolder && (
+            <MenuItem
+              icon={<IconFolder color={cm.labelColor} size={iconSize} />}
+              label="Move to Folder"
+              cm={cm}
+              onPress={handleMoveToFolder}
             />
           )}
 
@@ -392,10 +425,10 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
   },
   menuItemIcon: {
-    width: 28,
+    width: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

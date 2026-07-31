@@ -13,6 +13,7 @@ import { DEFAULT_CONFIG } from './types';
 import type {
   AccessibilityProfile,
   FontConfig,
+  FolderItem,
   GestureAction,
   GestureBindings,
   IconConfig,
@@ -49,6 +50,12 @@ export type WeftConfigContextValue = {
   gestures: GestureBindings;
   /** Ordered package names pinned to the home grid. */
   pinnedApps: string[];
+  /** Folders on the home grid. */
+  folders: FolderItem[];
+  /** Version of the last seeding run — compare to SEED_VERSION in HomeScreen. */
+  seedVersion: number;
+  /** Persist a new seedVersion after seeding completes. */
+  setSeedVersion: (v: number) => void;
   /**
    * True once the persisted config has been read from AsyncStorage (or the
    * read has failed gracefully).  Use this to gate rendering in App.tsx so
@@ -73,8 +80,16 @@ export type WeftConfigContextValue = {
   reorderWidgets: (newOrder: string[]) => void;
   /** Update a gesture binding. */
   setGestureBinding: (direction: keyof GestureBindings, action: GestureAction) => void;
-  /** Replace the list of package names pinned to the home grid. */
-  setPinnedApps: (packages: string[]) => void;
+  /** Replace the list of package names pinned to the home grid. Also accepts an updater function. */
+  setPinnedApps: (packages: string[] | ((prev: string[]) => string[])) => void;
+  /** Replace the full folders list. */
+  setFolders: (folders: FolderItem[] | ((prev: FolderItem[]) => FolderItem[])) => void;
+  /** Add a new folder (or replace one with the same id). */
+  upsertFolder: (folder: FolderItem) => void;
+  /** Remove a folder by id. Apps inside it are moved back to pinnedApps. */
+  removeFolder: (folderId: string) => void;
+  /** Move an app into a folder (removes it from pinnedApps directly). */
+  moveAppToFolder: (packageName: string, folderId: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -294,8 +309,74 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
     []
   );
 
-  const setPinnedApps = useCallback((packages: string[]) => {
-    setConfig(prev => ({ ...prev, pinnedApps: packages }));
+  const setPinnedApps = useCallback((packages: string[] | ((prev: string[]) => string[])) => {
+    setConfig(prev => ({
+      ...prev,
+      pinnedApps: typeof packages === 'function' ? packages(prev.pinnedApps) : packages,
+    }));
+  }, []);
+
+  const setSeedVersion = useCallback((v: number) => {
+    setConfig(prev => ({ ...prev, seedVersion: v }));
+  }, []);
+
+  const setFolders = useCallback((folders: FolderItem[] | ((prev: FolderItem[]) => FolderItem[])) => {
+    setConfig(prev => ({
+      ...prev,
+      folders: typeof folders === 'function' ? folders(prev.folders) : folders,
+    }));
+  }, []);
+
+  const upsertFolder = useCallback((folder: FolderItem) => {
+    setConfig(prev => {
+      const exists = prev.folders.some(f => f.id === folder.id);
+      const folders = exists
+        ? prev.folders.map(f => f.id === folder.id ? folder : f)
+        : [...prev.folders, folder];
+      // Add sentinel to pinnedApps if this is a new folder
+      const pinnedApps = exists
+        ? prev.pinnedApps
+        : [...prev.pinnedApps, `folder:${folder.id}`];
+      return { ...prev, folders, pinnedApps };
+    });
+  }, []);
+
+  const removeFolder = useCallback((folderId: string) => {
+    setConfig(prev => {
+      const folder = prev.folders.find(f => f.id === folderId);
+      if (!folder) return prev;
+      // Remove folder sentinel from pinnedApps, insert contained apps at that position
+      const sentinelIdx = prev.pinnedApps.indexOf(`folder:${folderId}`);
+      const newPinned = [...prev.pinnedApps];
+      if (sentinelIdx >= 0) {
+        newPinned.splice(sentinelIdx, 1, ...folder.packageNames);
+      } else {
+        newPinned.push(...folder.packageNames);
+      }
+      return {
+        ...prev,
+        folders: prev.folders.filter(f => f.id !== folderId),
+        pinnedApps: newPinned,
+      };
+    });
+  }, []);
+
+  const moveAppToFolder = useCallback((packageName: string, folderId: string) => {
+    setConfig(prev => {
+      // Remove app from pinnedApps (if it's there directly)
+      const pinnedApps = prev.pinnedApps.filter(p => p !== packageName);
+      // Remove app from any other folder it's in
+      const folders = prev.folders.map(f => {
+        if (f.id === folderId) {
+          // Add to target folder (avoid dupes)
+          const already = f.packageNames.includes(packageName);
+          return already ? f : { ...f, packageNames: [...f.packageNames, packageName] };
+        }
+        // Remove from any other folder
+        return { ...f, packageNames: f.packageNames.filter(p => p !== packageName) };
+      });
+      return { ...prev, pinnedApps, folders };
+    });
   }, []);
 
   // -------------------------------------------------------------------------
@@ -313,6 +394,8 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       widgets: config.widgets,
       gestures: config.gestures,
       pinnedApps: config.pinnedApps,
+      folders: config.folders,
+      seedVersion: config.seedVersion ?? 0,
       isHydrated,
       setParadigm,
       toggleProfile,
@@ -324,6 +407,11 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       reorderWidgets,
       setGestureBinding,
       setPinnedApps,
+      setSeedVersion,
+      setFolders,
+      upsertFolder,
+      removeFolder,
+      moveAppToFolder,
     }),
     [
       semantics,
@@ -336,6 +424,8 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       config.widgets,
       config.gestures,
       config.pinnedApps,
+      config.folders,
+      config.seedVersion,
       isHydrated,
       setParadigm,
       toggleProfile,
@@ -347,6 +437,11 @@ export function WeftConfigProvider({ children, initialConfig }: Props) {
       reorderWidgets,
       setGestureBinding,
       setPinnedApps,
+      setSeedVersion,
+      setFolders,
+      upsertFolder,
+      removeFolder,
+      moveAppToFolder,
     ],
   );
 

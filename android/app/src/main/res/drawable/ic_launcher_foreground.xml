@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Weft — ic_launcher_foreground
+    The foreground layer of the adaptive launcher icon.
+    Centers the splash_logo with inset padding so it sits comfortably
+    within the safe zone of round, squircle, and teardrop masks.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_logo"
+    android:inset="20%" />

@@ -50,10 +50,13 @@ import { useAdaptiveText } from '../hooks/useAdaptiveText';
 import { AppIcon } from '../components/AppIcon';
 import { AppContextMenu } from '../components/AppContextMenu';
 import { AppGridSkeleton } from '../components/AppGridSkeleton';
+import { FolderIcon } from '../components/FolderIcon';
+import { FolderModal } from '../components/FolderModal';
 import { Dock } from '../components/Dock';
 import { SectionHeader } from '../components/SectionHeader';
 import { WallpaperBackground } from '../components/WallpaperBackground';
 import { ClockWidget } from '../components/ClockWidget';
+import { buildInitialFolders, findFolderForPackage } from '../utils/appCategories';
 import { WidgetSlot } from '../components/WidgetSlot';
 import { AllAppsScreen } from './AllAppsScreen';
 
@@ -75,30 +78,6 @@ const DOCK_PACKAGES = [
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-
-/** Gear / settings icon — pure View, no emoji or native icon lib */
-function GearIcon({ color, size }: { color: string; size: number }) {
-  const r = size * 0.28;
-  const spoke = size * 0.09;
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Center circle */}
-      <View style={{ width: r * 2, height: r * 2, borderRadius: r,
-        borderWidth: spoke, borderColor: color, position: 'absolute' }} />
-      {/* 8 spokes */}
-      {[0, 45, 90, 135].map((deg) => (
-        <View key={deg} style={{
-          position: 'absolute', width: spoke * 1.6, height: size * 0.82,
-          borderRadius: spoke, backgroundColor: 'transparent',
-          borderLeftWidth: spoke, borderRightWidth: spoke,
-          borderTopWidth: size * 0.1, borderBottomWidth: size * 0.1,
-          borderColor: color,
-          transform: [{ rotate: `${deg}deg` }],
-        }} />
-      ))}
-    </View>
-  );
-}
 
 /** Single app icon cell rendered inside the page grid. */
 const AppGridItem = React.memo(function AppGridItem({
@@ -185,43 +164,6 @@ function DockApps({
 }
 
 // ---------------------------------------------------------------------------
-// DockCustomiseButton — small icon button tucked at the right end of the dock
-// ---------------------------------------------------------------------------
-
-/**
- * A compact icon-only button rendered inside the dock row, right-aligned.
- * Replaces the floating pill — less intrusive, always visible, contextually
- * placed where the user is already looking (the dock).
- */
-function DockCustomiseButton({
-  onPress,
-  isDark,
-}: {
-  onPress?: () => void;
-  isDark: boolean;
-}) {
-  const bgColor     = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
-  const borderColor = isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.12)';
-  const iconColor   = isDark ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.50)';
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[
-        styles.dockCustomiseBtn,
-        { backgroundColor: bgColor, borderColor: borderColor },
-      ]}
-      accessible
-      accessibilityLabel="Customise launcher"
-      accessibilityRole="button"
-      activeOpacity={0.65}
-    >
-      <GearIcon color={iconColor} size={17} />
-    </TouchableOpacity>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // PageDots — indicator dots for the horizontal page FlatList
 // ---------------------------------------------------------------------------
 
@@ -287,7 +229,7 @@ type HomeScreenProps = {
 };
 
 export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }: HomeScreenProps): React.JSX.Element {
-  const { semantics, paradigm, pinnedApps, setPinnedApps } = useWeftConfig();
+  const { semantics, pinnedApps, setPinnedApps, folders, setFolders, upsertFolder, moveAppToFolder, seedVersion, setSeedVersion } = useWeftConfig();
   const insets = useSafeAreaInsets();
   const { apps, loading, error } = useInstalledApps();
   const { badges, clearBadge } = useNotificationBadges();
@@ -297,14 +239,56 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
   const s = semantics;
   const layout = s.layout;
 
-  // ── Desktop apps — only pinned apps; empty home grid until user adds some ─
-  const desktopApps = useMemo(() => {
-    if (pinnedApps.length === 0) return []; // intentionally empty home screen
-    const byPkg = new Map(apps.map(a => [a.packageName, a]));
-    return pinnedApps
-      .map(pkg => byPkg.get(pkg))
-      .filter((a): a is NonNullable<typeof a> => a !== undefined);
-  }, [pinnedApps, apps]);
+  // ── Home screen seeding ───────────────────────────────────────────────────
+  // SEED_VERSION: bump this number whenever the seeding logic changes so
+  // existing users with stale data get re-seeded on next launch.
+  const SEED_VERSION = 2;
+
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    if (loading) return;
+    if (apps.length === 0) return;
+    // Re-seed if seedVersion in persisted config is older than current code
+    if (seedVersion >= SEED_VERSION) {
+      seededRef.current = true;
+      return;
+    }
+    seededRef.current = true;
+    const { folders: newFolders, pinnedApps: newPinned } =
+      buildInitialFolders(apps.map(a => a.packageName));
+    setFolders(newFolders);
+    setPinnedApps(newPinned);
+    setSeedVersion(SEED_VERSION);
+  }, [loading, apps, seedVersion, setFolders, setPinnedApps, setSeedVersion]);
+
+  // ── Auto-add newly installed apps to the right folder or home grid ────────
+  const prevAppsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (loading) return;
+    const currentPkgs = apps.map(a => a.packageName);
+    const prev = prevAppsRef.current;
+    if (prev.length === 0) {
+      prevAppsRef.current = currentPkgs;
+      return;
+    }
+    const prevSet = new Set(prev);
+    const newPkgs = currentPkgs.filter(p => !prevSet.has(p));
+    if (newPkgs.length > 0) {
+      newPkgs.forEach(pkg => {
+        const folderId = findFolderForPackage(pkg, folders);
+        if (folderId) {
+          moveAppToFolder(pkg, folderId);
+        } else {
+          setPinnedApps(current => {
+            const existing = new Set(current);
+            return existing.has(pkg) ? current : [...current, pkg];
+          });
+        }
+      });
+    }
+    prevAppsRef.current = currentPkgs;
+  }, [apps, loading, folders, moveAppToFolder, setPinnedApps]);
 
   // ── Current page tracking ─────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(0);
@@ -327,6 +311,14 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
     isSystemApp: boolean;
     anchorPosition: { x: number; y: number; width: number; height: number } | null;
   } | null>(null);
+
+  // ── Folder modal state ────────────────────────────────────────────────────
+  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
+  const openFolder = useCallback((id: string) => setOpenFolderId(id), []);
+  const closeFolder = useCallback(() => setOpenFolderId(null), []);
+
+  // ── Folder picker state (move app to folder) ──────────────────────────────
+  const [folderPickerPkg, setFolderPickerPkg] = useState<string | null>(null);
 
   // ── Back handler ──────────────────────────────────────────────────────────
   // Launchers must swallow the back button — returning true suppresses exit.
@@ -383,9 +375,10 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
     setContextMenu(prev => (prev ? { ...prev, visible: false } : null));
   }, []);
 
-  // ── Gesture handler — 4-direction swipes with configurable bindings ──────
-  const gestureHandler = useGestureHandler({
+  // ── Gesture handler — 4-direction swipes + background long-press ────────
+  const { panHandlers } = useGestureHandler({
     onOpenAllApps: openAllApps,
+    onLongPressBackground: onOpenCustomization,
   });
 
   // ── Layout math ───────────────────────────────────────────────────────────
@@ -414,19 +407,35 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
   const dockClearance = s.component.dock.height + insets.bottom + 8;
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  // 4 rows per page × gridColumns apps per row.
+  // 4 rows per page × gridColumns items per row.
+  // Each item is either an AppDetail (package name) or a folder sentinel.
+  type GridItem =
+    | { kind: 'app'; app: AppDetail }
+    | { kind: 'folder'; folderId: string };
+
   const appsPerPage = layout.gridColumns * 4;
 
-  const pages = useMemo<AppDetail[][]>(() => {
-    if (desktopApps.length === 0) {
-      return [];
-    }
-    const result: AppDetail[][] = [];
-    for (let i = 0; i < desktopApps.length; i += appsPerPage) {
-      result.push(desktopApps.slice(i, i + appsPerPage));
+  const gridItems = useMemo<GridItem[]>(() => {
+    const byPkg = new Map(apps.map(a => [a.packageName, a]));
+    return pinnedApps
+      .map(entry => {
+        if (entry.startsWith('folder:')) {
+          return { kind: 'folder' as const, folderId: entry.slice(7) };
+        }
+        const app = byPkg.get(entry);
+        return app ? { kind: 'app' as const, app } : null;
+      })
+      .filter((x): x is GridItem => x !== null);
+  }, [pinnedApps, apps]);
+
+  const pages = useMemo<GridItem[][]>(() => {
+    if (gridItems.length === 0) return [];
+    const result: GridItem[][] = [];
+    for (let i = 0; i < gridItems.length; i += appsPerPage) {
+      result.push(gridItems.slice(i, i + appsPerPage));
     }
     return result;
-  }, [desktopApps, appsPerPage]);
+  }, [gridItems, appsPerPage]);
 
   // ── Page scroll handler ───────────────────────────────────────────────────
   const handlePageScroll = useCallback(
@@ -439,11 +448,11 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
 
   // ── Page renderer ─────────────────────────────────────────────────────────
   const renderPage = useCallback(
-    ({ item: pageApps, index: pageIndex }: { item: AppDetail[]; index: number }) => {
-      // Build rows of gridColumns items for this page
-      const rows: AppDetail[][] = [];
-      for (let i = 0; i < pageApps.length; i += layout.gridColumns) {
-        rows.push(pageApps.slice(i, i + layout.gridColumns));
+    ({ item: pageItems, index: pageIndex }: { item: GridItem[]; index: number }) => {
+      // Build rows of gridColumns items
+      const rows: GridItem[][] = [];
+      for (let i = 0; i < pageItems.length; i += layout.gridColumns) {
+        rows.push(pageItems.slice(i, i + layout.gridColumns));
       }
 
       return (
@@ -470,24 +479,44 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
             </View>
           )}
 
-          {/* App grid rows */}
+          {/* Grid rows */}
           <View style={styles.pageGrid}>
             {rows.map((row, rowIndex) => (
               <View
                 key={rowIndex}
                 style={[styles.pageRow, { gap: layout.gridGap, marginBottom: layout.gridGap }]}
               >
-                {row.map(app => (
-                  <AppGridItem
-                    key={app.packageName}
-                    app={app}
-                    iconSize={iconSize}
-                    cellWidth={cellWidth}
-                    badgeCount={badges.get(app.packageName) ?? 0}
-                    editMode={editMode}
-                    onLongPress={(pos) => handleIconLongPress(app, pos)}
-                  />
-                ))}
+                {row.map((item, colIndex) => {
+                  if (item.kind === 'folder') {
+                    const folder = folders.find(f => f.id === item.folderId);
+                    if (!folder) return <View key={item.folderId} style={{ width: cellWidth }} />;
+                    return (
+                      <View key={item.folderId} style={[styles.gridCell, { width: cellWidth }]}>
+                        <FolderIcon
+                          folder={folder}
+                          apps={apps}
+                          onOpen={() => openFolder(folder.id)}
+                          editMode={editMode}
+                          onLongPressPosition={(pos) => {
+                            if (!editMode) setEditMode(true);
+                            // folder long-press just enters edit mode — no context menu yet
+                          }}
+                        />
+                      </View>
+                    );
+                  }
+                  return (
+                    <AppGridItem
+                      key={item.app.packageName}
+                      app={item.app}
+                      iconSize={iconSize}
+                      cellWidth={cellWidth}
+                      badgeCount={badges.get(item.app.packageName) ?? 0}
+                      editMode={editMode}
+                      onLongPress={(pos) => handleIconLongPress(item.app, pos)}
+                    />
+                  );
+                })}
                 {/* Fill trailing empty cells in the last row */}
                 {row.length < layout.gridColumns &&
                   Array.from({ length: layout.gridColumns - row.length }).map((_, i) => (
@@ -512,32 +541,23 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
       badges,
       editMode,
       handleIconLongPress,
+      folders,
+      apps,
+      openFolder,
     ],
   );
 
-  const pageKeyExtractor = useCallback((_: AppDetail[], index: number) => String(index), []);
+  const pageKeyExtractor = useCallback((_: GridItem[], index: number) => String(index), []);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View
       style={[styles.root, { backgroundColor: 'transparent' }]}
       accessible={false}
-      {...gestureHandler.panHandlers}
+      {...panHandlers}
     >
-      {/* ── Wallpaper layer — sits behind all content ──────────────── */}
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={1}
-        onLongPress={() => {
-          if (!editMode) {
-            setEditMode(true);
-          }
-        }}
-        delayLongPress={600}
-        accessible={false}
-      >
-        <WallpaperBackground key={resumeKey || undefined} screenWidth={SCREEN_WIDTH} scrollX={scrollX} />
-      </TouchableOpacity>
+      {/* ── Wallpaper layer ───────────────────────────────────────────── */}
+      <WallpaperBackground key={String(resumeKey)} screenWidth={SCREEN_WIDTH} scrollX={scrollX} />
 
       <StatusBar
         backgroundColor="transparent"
@@ -569,7 +589,7 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
       )}
 
       {/* ── Empty home state ──────────────────────────────────────────── */}
-      {!loading && error === null && desktopApps.length === 0 && (
+      {!loading && error === null && gridItems.length === 0 && (
         <View style={styles.emptyState}>
           <View style={[styles.emptyPhoneOuter, { borderColor: adaptiveText.textColorSoft }]}>
             <View style={[styles.emptyPhoneScreen, { backgroundColor: adaptiveText.textColorSoft }]} />
@@ -622,14 +642,7 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
       {/* ── Dock — always rendered, even during app list refresh ─────── */}
       <Dock style={{ paddingBottom: insets.bottom }}>
         <DockApps allApps={apps} badges={badges} />
-        {/* Customise button — right-aligned inside dock, only outside edit mode */}
-        {!editMode && (
-          <DockCustomiseButton
-            onPress={onOpenCustomization}
-            isDark={paradigm !== 'skeuo'}
-          />
-        )}
-        {/* Done button replaces customise in edit mode */}
+        {/* Done button — only visible in edit mode */}
         {editMode && (
           <TouchableOpacity
             onPress={() => setEditMode(false)}
@@ -716,7 +729,70 @@ export function HomeScreen({ onOpenCustomization, onOpenAllApps, resumeKey = 0 }
             setPinnedApps(pinnedApps.filter(p => p !== contextMenu.packageName));
             dismissContextMenu();
           }}
+          onMoveToFolder={folders.length > 0 ? () => {
+            setFolderPickerPkg(contextMenu.packageName);
+            dismissContextMenu();
+          } : undefined}
         />
+      )}
+
+      {/* ── Folder Modal ──────────────────────────────────────────────── */}
+      {openFolderId && (() => {
+        const folder = folders.find(f => f.id === openFolderId);
+        if (!folder) return null;
+        return (
+          <FolderModal
+            key={folder.id}
+            folder={folder}
+            apps={apps}
+            visible={openFolderId === folder.id}
+            onClose={closeFolder}
+          />
+        );
+      })()}
+
+      {/* ── Folder Picker — "Move to Folder" from context menu ────────── */}
+      {folderPickerPkg !== null && (
+        <TouchableOpacity
+          style={[StyleSheet.absoluteFill, styles.folderPickerScrim]}
+          activeOpacity={1}
+          onPress={() => setFolderPickerPkg(null)}
+          accessible={false}
+        >
+          <View
+            style={[
+              styles.folderPickerCard,
+              {
+                backgroundColor: s.surface.home.backgroundAlt,
+                borderColor: s.surface.home.border,
+              },
+            ]}
+          >
+            <Text style={[styles.folderPickerTitle, { color: s.surface.home.textPrimary }]}>
+              Move to Folder
+            </Text>
+            {folders.map(folder => (
+              <TouchableOpacity
+                key={folder.id}
+                style={[styles.folderPickerItem, { borderTopColor: s.surface.home.border }]}
+                onPress={() => {
+                  moveAppToFolder(folderPickerPkg, folder.id);
+                  setFolderPickerPkg(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={folder.name}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.folderPickerItemText, { color: s.surface.home.textPrimary }]}>
+                  {folder.name}
+                </Text>
+                <Text style={[styles.folderPickerItemCount, { color: s.surface.home.textSecondary }]}>
+                  {folder.packageNames.length} apps
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -773,21 +849,6 @@ const styles = StyleSheet.create({
   pageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  // ── Dock customise icon button ──
-  dockCustomiseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
-  },
-  dockCustomiseBtnIcon: {
-    fontSize: 17,
-    includeFontPadding: false,
-    lineHeight: 19,
   },
   // ── Dock done button (edit mode) ──
   dockDoneBtn: {
@@ -869,5 +930,43 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 2,
     opacity: 0.35,
+  },
+  // ── Folder picker ──
+  folderPickerScrim: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 300,
+  },
+  folderPickerCard: {
+    width: '78%',
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingTop: 4,
+  },
+  folderPickerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    opacity: 0.5,
+    paddingVertical: 14,
+  },
+  folderPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  folderPickerItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  folderPickerItemCount: {
+    fontSize: 13,
   },
 });

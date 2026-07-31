@@ -52,10 +52,7 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Unsplash API key
-// ---------------------------------------------------------------------------
-const UNSPLASH_ACCESS_KEY = 'UPQQjJY8oxnGVJuhYLXm6W0Sv3F_BTjtyCMyaVvaXUA';
+import { UNSPLASH_ACCESS_KEY } from '@env';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -333,6 +330,7 @@ export const WallpaperPickerSheet = memo(function WallpaperPickerSheet({
   const [unsplashPage,    setUnsplashPage]    = useState(1);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
   const [unsplashHasMore, setUnsplashHasMore] = useState(true);
+  const [unsplashError,   setUnsplashError]   = useState('');
   const debounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentQueryRef = useRef('');
 
@@ -358,18 +356,33 @@ export const WallpaperPickerSheet = memo(function WallpaperPickerSheet({
   const fetchUnsplash = useCallback(async (q: string, page: number, reset: boolean) => {
     if (!UNSPLASH_ACCESS_KEY) return;
     setUnsplashLoading(true);
+    setUnsplashError('');
     try {
       const ep = q.trim()
         ? `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&client_id=${UNSPLASH_ACCESS_KEY}&per_page=20&page=${page}`
         : `https://api.unsplash.com/photos?client_id=${UNSPLASH_ACCESS_KEY}&per_page=20&page=${page}`;
       const res  = await fetch(ep);
+
+      if (!res.ok) {
+        const status = res.status;
+        if (status === 403 || status === 401) {
+          setUnsplashError('API key invalid or revoked. Get a free key at unsplash.com/developers.');
+        } else if (status === 429) {
+          setUnsplashError('Rate limit reached (50 req/hr). Try again in a few minutes.');
+        } else {
+          setUnsplashError(`Unsplash error ${status}. Try again shortly.`);
+        }
+        setUnsplashLoading(false);
+        return;
+      }
+
       const json = await res.json();
       const results: UnsplashPhoto[] = q.trim() ? (json.results ?? []) : (json ?? []);
       setUnsplashPhotos(prev => reset ? results : [...prev, ...results]);
       setUnsplashHasMore(results.length === 20);
       setUnsplashPage(page);
-    } catch {
-      // leave existing results
+    } catch (e) {
+      setUnsplashError('Network error. Check your connection.');
     } finally {
       setUnsplashLoading(false);
     }
@@ -519,6 +532,27 @@ export const WallpaperPickerSheet = memo(function WallpaperPickerSheet({
         </View>
       );
     }
+
+    if (unsplashError) {
+      return (
+        <View style={styles.placeholderContainer}>
+          <Text style={[styles.placeholderTitle, { color: wp.searchBarText }]}>
+            Could not load photos
+          </Text>
+          <Text style={[styles.placeholderBody, { color: wp.categoryChipText }]}>
+            {unsplashError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.setButton, { backgroundColor: acc.primary, marginTop: 8 }]}
+            onPress={() => { setUnsplashError(''); fetchUnsplash(query, 1, true); }}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.setButtonText, { color: acc.onAccent }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     return (
       <FlatList<UnsplashPhoto>
         data={unsplashPhotos}
@@ -531,7 +565,6 @@ export const WallpaperPickerSheet = memo(function WallpaperPickerSheet({
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
           unsplashLoading ? (
-            // Skeleton grid while first page loads
             <View style={styles.skeletonGrid}>
               {Array.from({ length: 6 }).map((_, i) => (
                 <SkeletonCard key={i} width={THUMB_WIDTH} height={THUMB_HEIGHT} radius={wp.cardRadius} />

@@ -30,6 +30,7 @@ import {
   FlatList,
   Image,
   Linking,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -70,8 +71,8 @@ const SECTION_HEADER_HEIGHT = 36;
 /** Height of the search bar area (input + vertical padding). */
 const SEARCH_BAR_HEIGHT = 56;
 
-/** Height of the handle bar area. */
-const HANDLE_AREA_HEIGHT = 28;
+/** Height of the handle bar area — tall enough to be easily grabbable. */
+const HANDLE_AREA_HEIGHT = 44;
 
 /** Height of the recently-used horizontal row (including label + padding). */
 const RECENT_ROW_HEIGHT = 110;
@@ -485,11 +486,30 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
 
   const translateY = animValue.interpolate({
     inputRange:  [0, 1],
-    // When closed (0) the sheet must translate DOWN by its full height so it
-    // sits completely off screen — not just 6%, which left 88% covering Home.
     outputRange: [SHEET_HEIGHT, 0],
     extrapolate: 'clamp',
   });
+
+  // ── Swipe-down to dismiss ─────────────────────────────────────────────────
+  // A PanResponder on the handle + header area. Claim the gesture as soon as
+  // the user moves downward more than they move horizontally, then dismiss if
+  // they release with enough velocity or travel.
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  const dismissPan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, gs) =>
+        gs.dy > 8 && gs.dy > Math.abs(gs.dx) * 1.5,
+      onMoveShouldSetPanResponderCapture: (_e, gs) =>
+        gs.dy > 16 && gs.dy > Math.abs(gs.dx) * 2,
+      onPanResponderRelease: (_e, gs) => {
+        if (gs.dy > 80 || gs.vy > 0.5) {
+          onDismissRef.current();
+        }
+      },
+    }),
+  ).current;
 
   // ── Glass blur (lazy require, same pattern as ControlCenterScreen) ────────
 
@@ -557,11 +577,17 @@ const AllAppsScreen = React.memo<AllAppsScreenProps>(({
         />
       )}
 
-      {/* ── Handle + header ────────────────────────────────────────────── */}
-      <View style={[styles.handleArea, { height: HANDLE_AREA_HEIGHT }]}>
+      {/* ── Handle + header — drag down here to dismiss ────────────────── */}
+      <View
+        style={[styles.handleArea, { height: HANDLE_AREA_HEIGHT }]}
+        {...dismissPan.panHandlers}
+      >
         <View style={[styles.handle, { backgroundColor: s.handleColor }]} />
       </View>
-      <View style={[styles.sheetHeader, { paddingHorizontal: layout.screenPaddingH }]}>
+      <View
+        style={[styles.sheetHeader, { paddingHorizontal: layout.screenPaddingH }]}
+        {...dismissPan.panHandlers}
+      >
         <Text style={[styles.sheetTitle, { color: s.searchBarText }]}>All Apps</Text>
         <Text style={[styles.appCount, { color: s.searchBarPlaceholder }]}>
           {apps.length} apps

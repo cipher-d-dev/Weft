@@ -18,9 +18,40 @@
  */
 
 import React, { memo, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Linking, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 import { useWeftConfig } from '../hooks/useWeftConfig';
 import { useAdaptiveText } from '../hooks/useAdaptiveText';
+
+// ---------------------------------------------------------------------------
+// Clock app package names — tried in order, first installed one wins
+// ---------------------------------------------------------------------------
+
+const CLOCK_PACKAGES = [
+  'com.google.android.deskclock',
+  'com.android.deskclock',
+  'com.android.clock',
+  'com.samsung.android.app.clockpackage',
+  'com.sec.android.app.clockpackage',
+  'com.oneplus.clock',
+  'com.motorola.alarmclock',
+];
+
+async function openClockApp(): Promise<void> {
+  for (const pkg of CLOCK_PACKAGES) {
+    try {
+      const url = `intent://com.android.deskclock/#Intent;package=${pkg};scheme=android-app;end`;
+      const canOpen = await Linking.canOpenURL(`android-app://${pkg}`);
+      if (canOpen) {
+        await Linking.openURL(`android-app://${pkg}`);
+        return;
+      }
+    } catch { /* try next */ }
+  }
+  // Fallback: open the alarm/clock via a generic intent URI
+  try {
+    await Linking.openURL('android-app://com.android.deskclock');
+  } catch { /* non-fatal */ }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,38 +125,64 @@ export const ClockWidget = memo(function ClockWidget() {
   const textSecondary = adaptiveText.textColorSoft;
 
   return (
-    <Animated.View style={[styles.root, { opacity, transform: [{ translateY }] }]}>
-      {/* Time row */}
-      <View style={styles.timeRow}>
+    <TouchableWithoutFeedback
+      onPress={openClockApp}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={`${hours}:${minutes} ${ampm}, ${dateStr}. Tap to open clock`}
+    >
+      <Animated.View style={[styles.root, { opacity, transform: [{ translateY }] }]}>
+        {/* Time row */}
+        <View style={styles.timeRow}>
+          <Text
+            style={[
+              styles.timeDigits,
+              {
+                color: textPrimary,
+                fontFamily: s.component.appIcon.labelType.fontFamily,
+                fontSize: 56,
+                lineHeight: 60,
+                fontWeight: '300',
+                letterSpacing: -2,
+                textShadowColor: 'rgba(0,0,0,0.3)',
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 8,
+              },
+            ]}
+            allowFontScaling={false}
+          >
+            {hours}:{minutes}
+          </Text>
+          <Text
+            style={[
+              styles.ampm,
+              {
+                color: textSecondary,
+                fontFamily: s.component.appIcon.labelType.fontFamily,
+                fontSize: 14,
+                fontWeight: '500',
+                letterSpacing: 0.5,
+                textShadowColor: 'rgba(0,0,0,0.25)',
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 4,
+              },
+            ]}
+            allowFontScaling={false}
+          >
+            {ampm}
+          </Text>
+        </View>
+
+        {/* Date line */}
         <Text
           style={[
-            styles.timeDigits,
-            {
-              color: textPrimary,
-              fontFamily: s.component.appIcon.labelType.fontFamily,
-              fontSize: 56,
-              lineHeight: 60,
-              fontWeight: '300',
-              letterSpacing: -2,
-              // Subtle shadow so the clock reads on ANY wallpaper — dark or light
-              textShadowColor: 'rgba(0,0,0,0.3)',
-              textShadowOffset: { width: 0, height: 1 },
-              textShadowRadius: 8,
-            },
-          ]}
-          allowFontScaling={false}
-        >
-          {hours}:{minutes}
-        </Text>
-        <Text
-          style={[
-            styles.ampm,
+            styles.date,
             {
               color: textSecondary,
               fontFamily: s.component.appIcon.labelType.fontFamily,
-              fontSize: 14,
-              fontWeight: '500',
-              letterSpacing: 0.5,
+              fontSize: 13,
+              fontWeight: '400',
+              letterSpacing: 0.3,
               textShadowColor: 'rgba(0,0,0,0.25)',
               textShadowOffset: { width: 0, height: 1 },
               textShadowRadius: 4,
@@ -133,30 +190,10 @@ export const ClockWidget = memo(function ClockWidget() {
           ]}
           allowFontScaling={false}
         >
-          {ampm}
+          {dateStr}
         </Text>
-      </View>
-
-      {/* Date line */}
-      <Text
-        style={[
-          styles.date,
-          {
-            color: textSecondary,
-            fontFamily: s.component.appIcon.labelType.fontFamily,
-            fontSize: 13,
-            fontWeight: '400',
-            letterSpacing: 0.3,
-            textShadowColor: 'rgba(0,0,0,0.25)',
-            textShadowOffset: { width: 0, height: 1 },
-            textShadowRadius: 4,
-          },
-        ]}
-        allowFontScaling={false}
-      >
-        {dateStr}
-      </Text>
-    </Animated.View>
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
 });
 
